@@ -35,7 +35,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  const baseClasses = 'bg-gray-200 dark:bg-gray-700';
+  const baseClasses = 'bg-surface-muted';
 
   const variantClasses = {
     text: 'rounded',
@@ -48,19 +48,31 @@ export const Skeleton: React.FC<SkeletonProps> = ({
 
   const animationClasses = {
     pulse: 'animate-pulse',
-    wave: 'animate-shimmer bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 bg-[length:200%_100%]',
+    wave: 'animate-shimmer bg-gradient-to-r from-surface-muted via-surface-muted-strong to-surface-muted bg-[length:200%_100%]',
     none: '',
   };
 
-  const style: React.CSSProperties = {
-    width: width || '100%',
-    height: height || (variant === 'text' ? '1em' : '100%'),
+  const toTokenSize = (value: string | number | undefined, fallback: string): string => {
+    if (value === undefined || value === null || value === '') {
+      return fallback;
+    }
+    if (typeof value === 'number') {
+      return `h-[${value}px]`;
+    }
+    return value;
   };
+
+  const widthClass = width !== undefined ? `w-[${typeof width === 'number' ? `${width}px` : width}]` : 'w-full';
+  const heightClass =
+    height !== undefined
+      ? toTokenSize(height, variant === 'text' ? 'h-[1em]' : 'h-full')
+      : variant === 'text'
+        ? 'h-[1em]'
+        : 'h-full';
 
   return (
     <div
-      className={`${baseClasses} ${variantClasses[variant]} ${animationClasses[effectiveAnimation]} ${className}`}
-      style={style}
+      className={`${baseClasses} ${variantClasses[variant]} ${animationClasses[effectiveAnimation]} ${widthClass} ${heightClass} ${className}`}
       aria-busy="true"
       aria-live="polite"
       role="status"
@@ -72,7 +84,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
 
 export const CourseCardSkeleton: React.FC = () => {
   return (
-    <div className="border rounded-lg overflow-hidden shadow-sm" aria-busy="true">
+    <div className="border border-border rounded-lg overflow-hidden shadow-sm" aria-busy="true">
       <Skeleton height={200} className="w-full" />
       <div className="p-4 space-y-3">
         <Skeleton height={24} width="80%" />
@@ -131,7 +143,7 @@ export const CourseDetailSkeleton: React.FC = () => {
 
         {/* Right sidebar */}
         <div className="space-y-4">
-          <div className="border rounded-lg p-6 space-y-4">
+          <div className="border border-border rounded-lg p-6 space-y-4">
             <Skeleton height={200} className="w-full" />
             <Skeleton height={48} className="w-full" />
             <Skeleton height={20} width="60%" />
@@ -144,7 +156,7 @@ export const CourseDetailSkeleton: React.FC = () => {
       <div className="space-y-4">
         <Skeleton height={32} width="30%" />
         {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="border rounded-lg p-4 space-y-2">
+          <div key={index} className="border border-border rounded-lg p-4 space-y-2">
             <Skeleton height={24} width="60%" />
             <Skeleton height={16} width="40%" />
           </div>
@@ -166,7 +178,7 @@ export const DashboardSkeleton: React.FC = () => {
       {/* Stats cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="border rounded-lg p-6 space-y-3">
+          <div key={index} className="border border-border rounded-lg p-6 space-y-3">
             <Skeleton height={20} width="60%" />
             <Skeleton height={32} width="40%" />
             <Skeleton height={16} width="80%" />
@@ -179,7 +191,7 @@ export const DashboardSkeleton: React.FC = () => {
         <Skeleton height={28} width="30%" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="border rounded-lg p-4 space-y-3">
+            <div key={index} className="border border-border rounded-lg p-4 space-y-3">
               <div className="flex gap-4">
                 <Skeleton height={80} width={80} variant="rectangular" />
                 <div className="flex-1 space-y-2">
@@ -203,7 +215,7 @@ export const ProfileSkeleton: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-8" aria-busy="true" role="status">
       {/* Profile header with avatar and basic info */}
-      <div className="border rounded-lg p-8 space-y-6">
+      <div className="border border-border rounded-lg p-8 space-y-6">
         <div className="flex items-center gap-6">
           <Skeleton variant="circular" width={120} height={120} />
           <div className="flex-1 space-y-3">
@@ -217,7 +229,7 @@ export const ProfileSkeleton: React.FC = () => {
       {/* User stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="border rounded-lg p-4 space-y-2">
+          <div key={index} className="border border-border rounded-lg p-4 space-y-2">
             <Skeleton height={16} width="60%" />
             <Skeleton height={24} width="40%" />
           </div>
@@ -226,11 +238,11 @@ export const ProfileSkeleton: React.FC = () => {
 
       {/* Sections: About, Settings, etc. */}
       {Array.from({ length: 2 }).map((_, index) => (
-        <div key={index} className="border rounded-lg p-6 space-y-4">
+        <div key={index} className="border border-border rounded-lg p-6 space-y-4">
           <Skeleton height={24} width="30%" />
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, idx) => (
-              <div key={idx} className="flex justify-between items-center py-2 border-b">
+              <div key={idx} className="flex justify-between items-center py-2 border-b border-border">
                 <Skeleton height={20} width="40%" />
                 <Skeleton height={20} width="20%" />
               </div>
@@ -272,7 +284,7 @@ export const VideoPlayerSkeleton: React.FC = () => {
       <div className="mt-8 space-y-3">
         <Skeleton height={20} width="40%" />
         {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="border rounded-lg p-4 space-y-2">
+          <div key={index} className="border border-border rounded-lg p-4 space-y-2">
             <Skeleton height={18} width="70%" />
             <Skeleton height={14} width="50%" />
           </div>
