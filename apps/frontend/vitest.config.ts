@@ -21,6 +21,11 @@ export default defineConfig({
         '**/mockData',
         'src/app', // Next.js pages
       ],
+      include: [
+        'src/lib/i18n/**',
+        'src/lib/**/*.{ts,tsx}',
+        'src/components/**/*.{ts,tsx}',
+      ],
       thresholds: {
         lines: 85,
         functions: 85,
