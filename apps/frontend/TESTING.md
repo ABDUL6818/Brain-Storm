@@ -266,9 +266,105 @@ return res(ctx.status(500));
 });
 \`\`\`
 
+## Refactoring Pattern: Hooks + Transforms + Presentational Components
+
+Several large components (`Navbar`, `SearchBar`, `PaymentModal`, `QuizPlayer`) have been refactored into smaller, composable pieces. When working on these (or refactoring similar components), follow this pattern:
+
+### Structure
+
+1. **Custom hook** — owns data fetching and state logic (e.g. `useNavbar`, `useSearchBar`, `usePaymentModal`, `useQuizPlayer`).
+2. **Pure transform utilities** — move data transforms out of components into `src/lib/<feature>/transforms.ts` (e.g. `src/lib/navbar/transforms.ts`). These are pure functions and easy to unit test.
+3. **Presentational subcomponents** — split the UI into small components under a component folder (e.g. `src/components/Navbar/`), each receiving props only.
+4. **Backwards-compatible public props** — the top-level component keeps its existing public props API so callers don't break.
+
+### Testing the Custom Hook
+
+\`\`\`typescript
+import { renderHook, act, waitFor } from '@testing-library/react';
+import { useSearchBar } from '@/components/SearchBar/useSearchBar';
+
+describe('useSearchBar', () => {
+  it('updates query state', () => {
+    const { result } = renderHook(() => useSearchBar({ onSearch: vi.fn() }));
+
+    act(() => {
+      result.current.setQuery('blockchain');
+    });
+
+    expect(result.current.query).toBe('blockchain');
+  });
+
+  it('calls onSearch on submit', async () => {
+    const onSearch = vi.fn();
+    const { result } = renderHook(() => useSearchBar({ onSearch }));
+
+    act(() => {
+      result.current.setQuery('blockchain');
+    });
+    act(() => {
+      result.current.submit();
+    });
+
+    await waitFor(() => expect(onSearch).toHaveBeenCalledWith('blockchain'));
+  });
+});
+\`\`\`
+
+### Testing Transform Utilities
+
+\`\`\`typescript
+import { describe, it, expect } from 'vitest';
+import { mapNavbarLinks } from '@/lib/navbar/transforms';
+
+describe('mapNavbarLinks', () => {
+  it('maps raw links to display items', () => {
+    const result = mapNavbarLinks([{ href: '/courses', label: 'Courses' }]);
+    expect(result).toEqual([{ href: '/courses', label: 'Courses', active: false }]);
+  });
+
+  it('handles empty input', () => {
+    expect(mapNavbarLinks([])).toEqual([]);
+  });
+});
+\`\`\`
+
+### Testing Presentational Subcomponents
+
+\`\`\`typescript
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { NavbarLinks } from '@/components/Navbar/NavbarLinks';
+
+describe('NavbarLinks', () => {
+  const links = [{ href: '/courses', label: 'Courses', active: false }];
+
+  it('renders links', () => {
+    render(<NavbarLinks links={links} />);
+    expect(screen.getByRole('link', { name: 'Courses' })).toBeInTheDocument();
+  });
+
+  it('calls onNavigate when a link is clicked', async () => {
+    const onNavigate = vi.fn();
+    render(<NavbarLinks links={links} onNavigate={onNavigate} />);
+
+    await userEvent.click(screen.getByRole('link', { name: 'Courses' }));
+    expect(onNavigate).toHaveBeenCalledWith('/courses');
+  });
+});
+\`\`\`
+
+### Coverage for Refactors
+
+Refactored components (`Navbar`, `SearchBar`, `PaymentModal`, `QuizPlayer`) and their new hooks, transforms, and subcomponents must meet an **85%+ coverage** requirement. Add a unit test per new subcomponent and per new hook/transform, and verify with:
+
+\`\`\`bash
+npm run test:coverage -- src/components/Navbar src/lib/navbar
+\`\`\`
+
 ## Coverage Requirements
 
 ### Enforcement
+=======
 
 Coverage thresholds are enforced in CI:
 

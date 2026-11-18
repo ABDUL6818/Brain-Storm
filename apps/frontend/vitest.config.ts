@@ -13,12 +13,24 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html', 'json-summary'],
+      include: [
+        'src/components/**/*.{ts,tsx}',
+        'src/hooks/**/*.{ts,tsx}',
+        'src/utils/**/*.{ts,tsx}',
+        'src/lib/**/*.{ts,tsx}',
+      ],
       exclude: [
         'node_modules/',
         'src/__tests__/',
+        '**/__tests__/**',
+        '**/*.test.{ts,tsx}',
+        '**/*.spec.{ts,tsx}',
         '**/*.d.ts',
         '**/*.config.*',
         '**/mockData',
+        '**/mocks/**',
+        '**/fixtures/**',
+        '**/index.{ts,tsx}',
         'src/app', // Next.js pages
       ],
       thresholds: {
