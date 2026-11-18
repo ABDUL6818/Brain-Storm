@@ -20,6 +20,8 @@ export default defineConfig({
         '**/*.config.*',
         '**/mockData',
         'src/app', // Next.js pages
+        // CourseCard subcomponents/hook/utilities are covered by their own
+        // dedicated RTL unit tests; keep them in coverage accounting.
       ],
       thresholds: {
         lines: 85,

@@ -112,6 +112,39 @@ export function isCourseComplete(progressPct: number): boolean {
   return progressPct === COMPLETE_PCT;
 }
 
+/** Human-readable percentage label, clamped to 0-100. */
+export function formatProgressLabel(progressPct: number): string {
+  const clamped = Math.min(COMPLETE_PCT, Math.max(0, progressPct));
+  return `${Math.round(clamped)}%`;
+}
+
+/** Formats an ISO date string for display; falls back to an em dash when invalid. */
+export function formatIssuedDate(issuedAt: string): string {
+  const date = new Date(issuedAt);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+/** Builds the course lookup keyed by id from a raw course list. */
+export function indexCoursesById(courses: CourseData[]): Record<string, CourseData> {
+  return courses.reduce<Record<string, CourseData>>((acc, course) => {
+    acc[course.id] = course;
+    return acc;
+  }, {});
+}
+
+/** Derives the enrolled-course rows shown on the dashboard from raw API data. */
+export function buildEnrolledCourses(
+  progress: ProgressRecord[],
+  courses: Record<string, CourseData>
+): EnrolledCourse[] {
+  return joinCourses(progress, courses);
+}
+
 /** Applies a real-time progress update to the matching course, if any. */
 export function applyProgressUpdate(
   progress: ProgressRecord[],
