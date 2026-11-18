@@ -10,6 +10,10 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/__tests__/setup.ts'],
     exclude: ['**/node_modules/**', '**/e2e/**', '**/*.pact.test.ts'],
+    include: [
+      'src/**/*.{test,spec}.{ts,tsx}',
+      'src/**/__tests__/**/*.{test,spec}.{ts,tsx}',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html', 'json-summary'],
