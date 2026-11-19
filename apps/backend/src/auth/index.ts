@@ -14,8 +14,10 @@
  *
  *   auth/
  *   ├── decorators/   – @CurrentUser, @Roles
+ *   ├── dto/          – class-validator DTOs
  *   ├── entities/     – TypeORM entities owned by auth
  *   ├── guards/       – JwtAuthGuard, RolesGuard, ApiKeyAuthGuard, GoogleAuthGuard
+ *   ├── repositories/ – AuthRepository (persistence layer)
  *   └── strategies/   – JWT, API-key, Google Passport strategies
  */
 
@@ -30,6 +32,12 @@ export * from './decorators/index';
 
 // Entities
 export * from './entities/index';
+
+// DTOs
+export * from './dto/index';
+
+// Repositories
+export * from './repositories/index';
 
 // Core services / module
 export { AuthService } from './auth.service';

@@ -337,9 +337,142 @@ return res(ctx.status(500));
 });
 \`\`\`
 
+## Testing Refactored Components
+
+Several large components (`LessonViewer`, `WalletConnect`, `CredentialView`, `ProfileForm`) have been split into a consistent structure. Each module now lives in its own folder:
+
+```
+src/components/<Component>/
+├── <Component>.tsx          # Container: wires the hook to presentational parts
+├── <Component>.view.tsx     # Presentational subcomponents (pure, props-only)
+├── use<Component>.ts        # Custom hook: data fetching, state, side effects
+├── <component>.transforms.ts # Pure data transforms (no React)
+└── __tests__/
+    ├── <Component>.test.tsx
+    ├── <Component>.view.test.tsx
+    ├── use<Component>.test.ts
+    └── <component>.transforms.test.ts
+```
+
+The container keeps the original public props so existing imports remain backwards compatible.
+
+### Testing Each Layer
+
+#### Presentational subcomponents
+
+Pure components receive everything via props — render them directly with no providers or mocks:
+
+```typescript
+import { render, screen } from '@testing-library/react';
+import { LessonViewerView } from '../LessonViewer.view';
+
+it('renders lesson title and content', () => {
+  render(<LessonViewerView title="Intro" content="Hello" isLoading={false} />);
+  expect(screen.getByRole('heading', { name: 'Intro' })).toBeInTheDocument();
+  expect(screen.getByText('Hello')).toBeInTheDocument();
+});
+
+it('renders loading state', () => {
+  render(<LessonViewerView title="Intro" content="" isLoading />);
+  expect(screen.getByText(/loading/i)).toBeInTheDocument();
+});
+```
+
+#### Custom hooks
+
+Use `renderHook` and mock the hook's dependencies (API modules, wallet adapter):
+
+```typescript
+import { renderHook, waitFor } from '@testing-library/react';
+import { useLessonViewer } from '../useLessonViewer';
+import * as api from '@/lib/lessonApi';
+
+vi.mock('@/lib/lessonApi');
+
+it('loads lesson data', async () => {
+  vi.mocked(api.fetchLesson).mockResolvedValue({ id: '1', title: 'Intro' });
+
+  const { result } = renderHook(() => useLessonViewer('1'));
+
+  expect(result.current.isLoading).toBe(true);
+  await waitFor(() => expect(result.current.isLoading).toBe(false));
+  expect(result.current.lesson?.title).toBe('Intro');
+});
+```
+
+#### Transforms utilities
+
+Pure functions — test inputs and outputs directly, including edge cases (missing fields, empty arrays, malformed data):
+
+```typescript
+import { toLessonViewModel } from '../lessonViewer.transforms';
+
+it('maps raw lesson to view model', () => {
+  expect(toLessonViewModel({ id: '1', title: 'Intro', body: null })).toEqual({
+    id: '1',
+    title: 'Intro',
+    content: '',
+  });
+});
+```
+
+#### Container
+
+Test the container with the hook mocked to verify wiring between hook output and presentational components:
+
+```typescript
+vi.mock('../useLessonViewer');
+
+it('passes hook data to the view', () => {
+  vi.mocked(useLessonViewer).mockReturnValue({ lesson: { title: 'Intro' }, isLoading: false });
+  render(<LessonViewer lessonId="1" />);
+  expect(screen.getByRole('heading', { name: 'Intro' })).toBeInTheDocument();
+});
+```
+
+### Mocking the Wallet Adapter
+
+`WalletConnect` and `CredentialView` depend on the wallet adapter. Mock it at the module boundary so tests never touch a real wallet:
+
+```typescript
+vi.mock('@/lib/walletAdapter', () => ({
+  walletAdapter: {
+    connect: vi.fn().mockResolvedValue({ address: '0xabc' }),
+    disconnect: vi.fn().mockResolvedValue(undefined),
+    getPublicKey: vi.fn().mockReturnValue('0xabc'),
+    on: vi.fn(),
+    off: vi.fn(),
+  },
+}));
+```
+
+Reset adapter mocks in `beforeEach` (`vi.clearAllMocks()`) so connection state does not leak between tests.
+
+### Mocking API Calls
+
+Mock API modules with `vi.mock` (or MSW for integration-style tests). Always cover success, error and empty responses:
+
+```typescript
+vi.mock('@/lib/profileApi', () => ({
+  fetchProfile: vi.fn(),
+  updateProfile: vi.fn(),
+}));
+
+it('shows an error when the profile request fails', async () => {
+  vi.mocked(profileApi.fetchProfile).mockRejectedValue(new Error('boom'));
+  render(<ProfileForm />);
+  expect(await screen.findByText(/error/i)).toBeInTheDocument();
+});
+```
+
+### Coverage Expectation
+
+The refactored modules — `LessonViewer`, `WalletConnect`, `CredentialView` and `ProfileForm` — are expected to maintain **85%+ coverage** (lines, functions, branches and statements) across their container, view, hook and transforms files. Because each layer is tested in isolation, hitting this threshold is straightforward: presentational components and transforms are pure, and hooks are tested with mocked dependencies.
+
 ## Coverage Requirements
 
 ### Enforcement
+=======
 
 Coverage thresholds are enforced in CI:
 

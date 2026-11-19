@@ -7,13 +7,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
-import { PasswordResetToken } from './password-reset-token.entity';
-import { RefreshToken } from './refresh-token.entity';
-import { ApiKey } from './api-key.entity';
+import { AuthRepository } from './auth.repository';
 import { TokenBlacklistService } from './token-blacklist.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -29,12 +25,7 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     private mailService: MailService,
-    @InjectRepository(PasswordResetToken)
-    private resetTokenRepo: Repository<PasswordResetToken>,
-    @InjectRepository(RefreshToken)
-    private refreshTokenRepo: Repository<RefreshToken>,
-    @InjectRepository(ApiKey)
-    private apiKeyRepo: Repository<ApiKey>,
+    private authRepository: AuthRepository,
     private encryptionService: EncryptionService,
     private auditService: AuditService,
     private tokenBlacklistService: TokenBlacklistService
@@ -161,9 +152,7 @@ export class AuthService {
   async refresh(rawRefreshToken: string) {
     const hash = this.hashToken(rawRefreshToken);
 
-    const stored = await this.refreshTokenRepo.findOne({
-      where: { tokenHash: hash, revoked: false },
-    });
+    const stored = await this.authRepository.findActiveRefreshToken(hash);
 
     if (!stored) throw new UnauthorizedException('Invalid or revoked refresh token');
     if (stored.expiresAt < new Date()) {
@@ -171,7 +160,7 @@ export class AuthService {
     }
 
     // Revoke old token (rotation)
-    await this.refreshTokenRepo.save({ ...stored, revoked: true });
+    await this.authRepository.revokeRefreshToken(stored);
 
     const user = await this.usersService.findById(stored.userId);
     if (!user) throw new UnauthorizedException('User not found');
@@ -181,11 +170,9 @@ export class AuthService {
 
   async logout(rawRefreshToken: string, userId?: string, accessToken?: string) {
     const hash = this.hashToken(rawRefreshToken);
-    const stored = await this.refreshTokenRepo.findOne({
-      where: { tokenHash: hash, revoked: false },
-    });
+    const stored = await this.authRepository.findActiveRefreshToken(hash);
     if (stored) {
-      await this.refreshTokenRepo.save({ ...stored, revoked: true });
+      await this.authRepository.revokeRefreshToken(stored);
     }
 
     // Blacklist the access token if provided
@@ -243,20 +230,14 @@ export class AuthService {
     if (!user) return { message: 'If that email exists, a reset link has been sent.' };
 
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    const recentTokens = await this.resetTokenRepo
-      .createQueryBuilder('t')
-      .where('t.userId = :userId', { userId: user.id })
-      .andWhere('t.createdAt > :since', { since: oneHourAgo })
-      .getCount();
+    const recentTokens = await this.authRepository.countRecentResetTokens(user.id, oneHourAgo);
 
     if (recentTokens >= 3) {
       throw new BadRequestException('Too many reset requests. Please wait before trying again.');
     }
 
     const { token, hash, expiresAt } = this.generateOpaqueToken(1);
-    await this.resetTokenRepo.save(
-      this.resetTokenRepo.create({ tokenHash: hash, userId: user.id, expiresAt, used: false })
-    );
+    await this.authRepository.createResetToken(hash, user.id, expiresAt);
 
     await this.mailService.sendPasswordResetEmail(user.email, token);
     await this.auditService.log(AuditAction.PASSWORD_RESET_REQUEST, user.id, true, { email });
@@ -265,9 +246,7 @@ export class AuthService {
 
   async resetPassword(token: string, newPassword: string) {
     const hash = this.hashToken(token);
-    const resetToken = await this.resetTokenRepo.findOne({
-      where: { tokenHash: hash, used: false },
-    });
+    const resetToken = await this.authRepository.findUnusedResetToken(hash);
 
     if (!resetToken) throw new BadRequestException('Invalid or expired reset token');
     if (resetToken.expiresAt < new Date()) {
@@ -276,7 +255,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await this.usersService.update(resetToken.userId, { passwordHash });
-    await this.resetTokenRepo.save({ ...resetToken, used: true });
+    await this.authRepository.markResetTokenUsed(resetToken);
     await this.auditService.log(AuditAction.PASSWORD_RESET_COMPLETE, resetToken.userId, true);
 
     return { message: 'Password reset successfully. You can now log in.' };
@@ -355,16 +334,14 @@ export class AuthService {
     const rawKey = `bst_${crypto.randomBytes(32).toString('hex')}`;
     const hash = crypto.createHash('sha256').update(rawKey).digest('hex');
 
-    const key = await this.apiKeyRepo.save(
-      this.apiKeyRepo.create({ name, keyHash: hash, userId, isActive: true })
-    );
+    const key = await this.authRepository.createApiKey(name, hash, userId);
 
     await this.auditService.log(AuditAction.API_KEY_CREATED, userId, true, { name, keyId: key.id });
     return { apiKey: rawKey };
   }
 
   async revokeApiKey(id: string, userId?: string) {
-    await this.apiKeyRepo.update(id, { isActive: false });
+    await this.authRepository.deactivateApiKey(id);
     await this.auditService.log(AuditAction.API_KEY_REVOKED, userId || null, true, { keyId: id });
     return { message: 'API key revoked' };
   }
@@ -435,9 +412,7 @@ export class AuthService {
     const access_token = this.jwtService.sign({ sub: userId, email, role }, { expiresIn: '15m' });
 
     const { token: rawRefresh, hash, expiresAt } = this.generateOpaqueToken(24 * 7); // 7 days
-    await this.refreshTokenRepo.save(
-      this.refreshTokenRepo.create({ tokenHash: hash, userId, expiresAt, revoked: false })
-    );
+    await this.authRepository.createRefreshToken(hash, userId, expiresAt);
 
     return { access_token, refresh_token: rawRefresh };
   }

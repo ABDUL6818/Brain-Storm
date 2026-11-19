@@ -36,6 +36,14 @@ export default defineConfig({
       name: 'Mobile Safari',
       use: { ...devices['iPhone 12'] },
     },
+    {
+      name: 'a11y',
+      testDir: './e2e/a11y',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://localhost:3001',
+      },
+    },
   ],
   webServer: {
     command: 'npm run dev',

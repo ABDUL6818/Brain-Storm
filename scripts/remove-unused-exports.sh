@@ -45,9 +45,20 @@ echo ""
 
 # Expected line format from find-unused-exports.sh:
 #   <relative/path/to/file.ts>:<line>:<exportName>
-# Lines that do not match this format are skipped.
+# Malformed entries are treated as hard errors so the report can be fixed
+# rather than silently ignored.
 REMOVED=0
 SKIPPED=0
+ERRORS=0
+
+# Barrel files re-export the public surface of a package. Un-exporting a
+# symbol from a barrel would break consumers, so they are never edited.
+is_barrel_file() {
+    case "$1" in
+        */index.ts|*/index.tsx|*/index.js|*/index.jsx) return 0 ;;
+        *) return 1 ;;
+    esac
+}
 
 while IFS= read -r line; do
     # Trim leading/trailing whitespace
@@ -60,16 +71,41 @@ while IFS= read -r line; do
     lineno="${rest%%:*}"
     export_name="${rest#*:}"
 
-    if [ -z "$file" ] || [ -z "$lineno" ] || [ -z "$export_name" ] || [ "$file" = "$line" ]; then
-        echo -e "  ${YELLOW}⚠️  Skipping malformed entry: $line${NC}"
-        SKIPPED=$((SKIPPED + 1))
+    if [ -z "$file" ] || [ -z "$lineno" ] || [ -z "$export_name" ] || [ "$file" = "$line" ] \
+        || ! [[ "$lineno" =~ ^[0-9]+$ ]]; then
+        echo -e "  ${RED}❌ Malformed entry in $UNUSED_FILE: $line${NC}"
+        ERRORS=$((ERRORS + 1))
         continue
     fi
 
     if [ ! -f "$file" ]; then
-        echo -e "  ${YELLOW}⚠️  File not found, skipping: $file${NC}"
+        echo -e "  ${RED}❌ File not found for entry: $file${NC}"
+        ERRORS=$((ERRORS + 1))
+        continue
+    fi
+
+    if is_barrel_file "$file"; then
+        echo -e "  ${YELLOW}⚠️  Skipping barrel file (never edited): $file${NC}"
         SKIPPED=$((SKIPPED + 1))
         continue
+    fi
+
+    # Re-verify the symbol is genuinely unreferenced before editing. Look for
+    # any import/usage of the name outside the declaring file itself.
+    if grep -rqE "(^|[^[:alnum:]_$])${export_name}([^[:alnum:]_$]|$)" \
+        --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' \
+        --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build \
+        . 2>/dev/null; then
+        refs="$(grep -rlE "(^|[^[:alnum:]_$])${export_name}([^[:alnum:]_$]|$)" \
+            --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' \
+            --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build \
+            . 2>/dev/null | grep -v "^\./${file}$" || true)"
+        if [ -n "$refs" ]; then
+            echo -e "  ${YELLOW}⚠️  Still referenced, skipping: $export_name ($file:$lineno)${NC}"
+            echo -e "      Referenced in: $(echo "$refs" | tr '\n' ' ')${NC}"
+            SKIPPED=$((SKIPPED + 1))
+            continue
+        fi
     fi
 
     # Un-export the symbol on the given line by removing the leading `export `
@@ -91,8 +127,8 @@ while IFS= read -r line; do
         echo -e "  ${GREEN}✅ Un-exported: $export_name ($file:$lineno)${NC}"
         REMOVED=$((REMOVED + 1))
     else
-        echo -e "  ${YELLOW}⚠️  No export found at $file:$lineno, skipping: $export_name${NC}"
-        SKIPPED=$((SKIPPED + 1))
+        echo -e "  ${RED}❌ No export found at $file:$lineno for: $export_name${NC}"
+        ERRORS=$((ERRORS + 1))
     fi
 done < "$UNUSED_FILE"
 
@@ -100,7 +136,14 @@ echo ""
 echo -e "${GREEN}✅ Removal complete!${NC}"
 echo -e "   Un-exported: ${GREEN}$REMOVED${NC}"
 echo -e "   Skipped:     ${YELLOW}$SKIPPED${NC}"
+echo -e "   Errors:      ${RED}$ERRORS${NC}"
 echo ""
+
+if [ "$ERRORS" -gt 0 ]; then
+    echo -e "${RED}❌ $ERRORS malformed or unresolvable entr(ies) found in $UNUSED_FILE.${NC}"
+    echo -e "${YELLOW}   Fix the report (or the source) and re-run.${NC}"
+    exit 1
+fi
 
 # Re-run the checker to verify zero unused exports remain
 echo -e "${BLUE}🔍 Re-running unused-export checker to verify...${NC}"
