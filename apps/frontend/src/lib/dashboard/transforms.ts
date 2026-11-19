@@ -9,6 +9,16 @@ import type {
   LeaderboardSortKey,
   ProgressRecord,
 } from './types';
+import type {
+  CredentialDisplay,
+  CredentialVerificationStatus,
+  LessonListItem,
+  LessonProgressStatus,
+  ProfileFieldErrors,
+  ProfileFormValues,
+  ProfilePayload,
+  ProfileResponse,
+} from './viewerTypes';
 
 /**
  * Pure transforms behind the dashboard. Keeping them out of the components makes
