@@ -118,3 +118,6 @@ export function ErrorFallback({ error, reset, title, description }: ErrorFallbac
     </div>
   );
 }
+
+export default ErrorBoundary;
+</｜｜DSML｜｜ parameter>

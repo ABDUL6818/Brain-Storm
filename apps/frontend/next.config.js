@@ -1,16 +1,28 @@
 const createNextIntlPlugin = require('next-intl/plugin');
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
+// NOTE: Runtime env access is centralized in `src/config` (see `src/config/env.ts`).
+// Components must import from that module instead of reading `process.env` directly.
+// The `env` block below only inlines the public variables at build time so the
+// centralized config module can read them in the browser; keep it in sync with
+// the keys defined in `src/config/env.ts`.
+const PUBLIC_ENV_KEYS = [
+  'NEXT_PUBLIC_API_URL',
+  'NEXT_PUBLIC_STELLAR_NETWORK',
+  'NEXT_PUBLIC_SENTRY_DSN',
+  'NEXT_PUBLIC_GIT_COMMIT_SHA',
+];
+
+const publicEnv = PUBLIC_ENV_KEYS.reduce((acc, key) => {
+  acc[key] = process.env[key];
+  return acc;
+}, {});
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-    NEXT_PUBLIC_STELLAR_NETWORK: process.env.NEXT_PUBLIC_STELLAR_NETWORK,
-    NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
-    NEXT_PUBLIC_GIT_COMMIT_SHA: process.env.NEXT_PUBLIC_GIT_COMMIT_SHA,
-  },
+  env: publicEnv,
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
@@ -42,10 +54,41 @@ const nextConfig = {
       '@dnd-kit/core',
       '@dnd-kit/sortable',
     ],
+    // Route-level code splitting: emit a separate chunk per route so heavy
+    // page components are only downloaded when their route is visited.
+    optimizeCss: true,
+  },
+  webpack(config, { isServer }) {
+    if (!isServer) {
+      // Split shared vendor code into its own long-lived chunk so route
+      // chunks stay small and cacheable across deploys.
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          ...(config.optimization && config.optimization.splitChunks),
+          chunks: 'all',
+          cacheGroups: {
+            ...(config.optimization &&
+              config.optimization.splitChunks &&
+              config.optimization.splitChunks.cacheGroups),
+            defaultVendors: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendors',
+              chunks: 'all',
+              priority: -10,
+              reuseExistingChunk: true,
+            },
+          },
+        },
+      };
+    }
+    return config;
   },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
+  // Build-time flags (NODE_ENV, ANALYZE) are read here only; runtime feature
+  // flags live in `src/config` and must be consumed from there.
   async headers() {
     return [
       {

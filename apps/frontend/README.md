@@ -1,253 +1,168 @@
 # Frontend
 
-This package contains the Next.js frontend application.
+This package contains the Next.js frontend for the application.
 
-## Getting started
+## Architecture patterns
 
-```bash
-pnpm install
-pnpm dev
-```
+This app follows a few conventions that keep the codebase maintainable and testable. Please follow them when adding or changing code.
 
-## Documentation patterns
+### 1. Wallet logic: the `useWallet` hook / service
 
-This README documents three cross-cutting patterns used throughout the frontend:
+All Stellar wallet SDK calls are isolated behind a small, mockable service interface. Components never import the Stellar SDK directly — they consume the `useWallet` hook, which wraps a `WalletService` adapter.
 
-1. [Internationalization (i18n) string extraction](#internationalization-i18n-string-extraction)
-2. [Image and font optimization](#image-and-font-optimization)
-3. [Strict typing](#strict-typing)
+- **`WalletService`** — the interface describing the wallet operations (`connect`, `disconnect`, `signTransaction`, `getPublicKey`, etc.).
+- **`StellarWalletService`** — the default adapter that talks to the Stellar SDK.
+- **`useWallet()`** — the React hook that exposes wallet state (`address`, `connected`, `connecting`, `error`) and actions (`connect`, `disconnect`, `signTransaction`).
 
----
+#### Adapter injection example
 
-## Internationalization (i18n) string extraction
-
-All user-facing text must be extracted into locale files instead of being hardcoded in components. This keeps copy maintainable, enables translation, and avoids duplicated strings.
-
-### Locale file layout
-
-Locale files live under `src/locales/` and are plain JSON keyed by namespace:
-
-```
-src/locales/
-├── en.json
-├── es.json
-└── ...
-```
-
-`en.json` is the source of truth. Every other locale file must contain the same keys.
-
-```json
-{
-  "common": {
-    "save": "Save",
-    "cancel": "Cancel"
-  },
-  "home": {
-    "title": "Welcome",
-    "subtitle": "Get started by editing your profile."
-  }
-}
-```
-
-### Translation helper / hook
-
-Use the translation hook in client components and the helper in server components. Both resolve keys using dot notation (`namespace.key`).
+The service is injectable, so tests and stories can supply a mock instead of hitting the real SDK:
 
 ```tsx
-// Client component
-import { useTranslation } from '@/i18n/useTranslation';
+import { WalletProvider } from '@/hooks/useWallet';
+import type { WalletService } from '@/services/wallet';
 
-export function SaveButton() {
-  const { t } = useTranslation();
-  return <button type="button">{t('common.save')}</button>;
-}
-```
-
-```tsx
-// Server component
-import { getTranslation } from '@/i18n/getTranslation';
-
-export default function HomePage() {
-  const t = getTranslation('en');
-  return <h1>{t('home.title')}</h1>;
-}
-```
-
-### Adding new keys
-
-1. Add the key to `src/locales/en.json` under the appropriate namespace.
-2. Mirror the key in every other locale file (use the English value as a placeholder if a translation is not yet available).
-3. Reference the key from the component via `t('namespace.key')`.
-4. Add or update a test that asserts the rendered text matches the locale value.
-
-### Replacing hardcoded strings
-
-Before:
-
-```tsx
-export function SaveButton() {
-  return <button type="button">Save</button>;
-}
-```
-
-After:
-
-```tsx
-import { useTranslation } from '@/i18n/useTranslation';
-
-export function SaveButton() {
-  const { t } = useTranslation();
-  return <button type="button">{t('common.save')}</button>;
-}
-```
-
-Guidelines:
-
-- Never hardcode user-visible text in JSX, `aria-label`, `title`, `placeholder`, or `alt` attributes.
-- Keep keys descriptive and namespaced by feature (`home.title`, `settings.profile.save`).
-- Do not concatenate translated fragments; use interpolation in the locale value instead.
-
----
-
-## Image and font optimization
-
-### Images
-
-Use `next/image` for all raster images. Always provide `width` and `height` (or `fill` with a sized parent) to prevent layout shift, and set `sizes` for responsive images. Images below the fold should be lazy loaded (the default); only the hero/above-the-fold image should use `priority`.
-
-```tsx
-import Image from 'next/image';
-
-export function Hero() {
-  return (
-    <Image
-      src="/images/hero.jpg"
-      alt="Hero"
-      width={1200}
-      height={630}
-      sizes="(max-width: 768px) 100vw, 1200px"
-      priority
-    />
-  );
-}
-```
-
-```tsx
-// Below-the-fold image: lazy loaded by default
-<Image
-  src="/images/card.png"
-  alt="Card"
-  width={400}
-  height={300}
-  sizes="(max-width: 768px) 100vw, 400px"
-/>
-```
-
-### Fonts
-
-Use `next/font` to self-host fonts and eliminate layout shift. Do not load fonts via `<link>` tags or CSS `@import`.
-
-```tsx
-import { Inter } from 'next/font/google';
-
-const inter = Inter({ subsets: ['latin'], display: 'swap' });
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en" className={inter.className}>
-      <body>{children}</body>
-    </html>
-  );
-}
-```
-
-### `next.config.js`
-
-Remote image hosts must be allow-listed via `images.remotePatterns`, and modern formats should be enabled:
-
-```js
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  images: {
-    formats: ['image/avif', 'image/webp'],
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'images.example.com',
-        pathname: '/**',
-      },
-    ],
-  },
+// A mock adapter for tests / local development
+const mockWalletService: WalletService = {
+  connect: async () => 'GABC...',
+  disconnect: async () => {},
+  getPublicKey: async () => 'GABC...',
+  signTransaction: async (xdr) => xdr,
 };
 
-module.exports = nextConfig;
-```
-
-### Lighthouse before/after
-
-Lighthouse runs are configured via `lighthouserc.js` at the package root. Capture a baseline before changing images/fonts, then re-run after the change and record the results in the PR description.
-
-```bash
-pnpm build
-pnpm lighthouse
-```
-
-`lighthouserc.js` defines the URLs to audit and the performance budgets that must be met.
-
----
-
-## Strict typing
-
-The frontend uses TypeScript in strict mode. `any` is not permitted; use `unknown` and narrow, or define an explicit type.
-
-### `tsconfig.json`
-
-```json
-{
-  "compilerOptions": {
-    "strict": true,
-    "noImplicitAny": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true
-  }
-}
-```
-
-### Component props
-
-Every component must declare an explicit props interface. Do not rely on inferred or implicit `any` props.
-
-```tsx
-interface CardProps {
-  title: string;
-  description?: string;
-  onSelect: (id: string) => void;
-}
-
-export function Card({ title, description, onSelect }: CardProps) {
+export function App() {
   return (
-    <button type="button" onClick={() => onSelect(title)}>
-      <h2>{title}</h2>
-      {description ? <p>{description}</p> : null}
-    </button>
+    <WalletProvider service={mockWalletService}>
+      <WalletButton />
+    </WalletProvider>
   );
 }
 ```
 
-Guidelines:
+In components, always use the hook:
 
-- Declare a named `interface` (or `type`) for every component's props.
-- Mark optional props explicitly with `?`; do not default to `any`.
-- Type event handlers (`React.ChangeEvent<HTMLInputElement>`, etc.) rather than using `any`.
-- Prefer discriminated unions over loose object shapes.
-- Run `pnpm typecheck` (or `tsc --noEmit`) before opening a PR.
+```tsx
+import { useWallet } from '@/hooks/useWallet';
 
----
+function WalletButton() {
+  const { connected, address, connect, disconnect } = useWallet();
+  return connected ? (
+    <button onClick={disconnect}>{address}</button>
+  ) : (
+    <button onClick={connect}>Connect wallet</button>
+  );
+}
+```
+
+**Rules**
+
+- Do not import `@stellar/stellar-sdk` (or any wallet SDK) inside components. Put SDK calls in the service adapter.
+- Add new wallet operations to the `WalletService` interface and implement them in the adapter, then surface them through `useWallet`.
+- In tests, inject a mock `WalletService` rather than mocking the SDK.
+
+### 2. Design tokens and theming
+
+Visual values (colors, spacing, radii, font sizes, shadows, z-index) live in a single theme/token file (`src/theme`). Components reference tokens instead of hard-coded values.
+
+- **No inline styles** for anything that belongs to the design system. Use the token-based styling utilities / CSS variables.
+- **No magic values.** Replace raw values like `#3b82f6`, `16px`, or `z-index: 9999` with the corresponding token (e.g. `colors.primary`, `space[4]`, `zIndex.modal`).
+- **No duplicated CSS.** If a style is reused, extract it into a shared component or a token-driven utility rather than copy-pasting rules.
+
+```tsx
+import { colors, space } from '@/theme';
+
+// Good: token-driven
+<div style={{ color: colors.text.primary, padding: space[4] }} />
+
+// Avoid: magic values
+<div style={{ color: '#111827', padding: '16px' }} />
+```
+
+When you need a new value, add it to the theme first, then use it.
+
+### 3. Centralized config, env access and feature flags
+
+All environment access and configuration lives in a single config module (`src/config`). Components must **not** read `process.env` directly.
+
+```ts
+// src/config/index.ts
+export const config = {
+  apiUrl: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001',
+  network: process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? 'testnet',
+  features: {
+    newWalletFlow: process.env.NEXT_PUBLIC_FEATURE_NEW_WALLET_FLOW === 'true',
+  },
+} as const;
+```
+
+Use it in components:
+
+```tsx
+import { config } from '@/config';
+
+if (config.features.newWalletFlow) {
+  // ...
+}
+```
+
+**Rules**
+
+- Only the config module reads `process.env`. Everything else imports from `@/config`.
+- Feature flags are declared in `config.features` and default to a safe value when the env var is absent.
+- Add new env vars to the config module (and to `.env.example`) rather than reading them ad hoc.
+
+### 4. Loading, empty and skeleton states
+
+Use the shared `Skeleton` and `EmptyState` components for loading and empty states instead of ad-hoc spinners or placeholder markup.
+
+```tsx
+import { Skeleton } from '@/components/Skeleton';
+import { EmptyState } from '@/components/EmptyState';
+
+function TransactionList({ loading, items }) {
+  if (loading) {
+    return (
+      <div>
+        <Skeleton width="100%" height={48} />
+        <Skeleton width="100%" height={48} />
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        title="No transactions yet"
+        description="Transactions will appear here once you make one."
+      />
+    );
+  }
+
+  return <ul>{/* ... */}</ul>;
+}
+```
+
+**Rules**
+
+- Use `Skeleton` for loading placeholders and `EmptyState` for zero-data states.
+- Keep these components presentational and reusable; pass content via props.
+- Prefer them over one-off loading/empty markup so states look and behave consistently.
 
 ## Testing
 
-- Unit and smoke render tests live alongside components (`*.test.tsx`).
-- Run the suite with `pnpm test`.
-- When extracting strings, assert rendered text against the locale value.
-- When optimizing images, assert `next/image` receives the expected `width`, `height`, and `sizes` props.
-- When tightening types, add tests that exercise optional and required props.
+Run the unit and smoke render tests from `apps/frontend`:
+
+```bash
+# All tests
+npm test
+
+# Watch mode
+npm test -- --watch
+
+# A single file
+npm test -- path/to/file.test.tsx
+```
+
+- **Unit tests** cover hooks, services and utilities. For wallet logic, inject a mock `WalletService` into `WalletProvider` (see above) — never call the real SDK in tests.
+- **Smoke render tests** render components (including `Skeleton` and `EmptyState`) to verify they mount without errors and render expected content.
+- When you touch a component, update or add tests for the affected behavior.
