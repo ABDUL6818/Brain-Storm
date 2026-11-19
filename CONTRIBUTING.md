@@ -223,6 +223,16 @@ npm run lint
 
 See [docs/SETUP.md](docs/SETUP.md) for the full setup and local deployment guide, and [docs/API.md](docs/API.md) for the API reference.
 
+## Architecture Decisions
+
+Significant architectural decisions are recorded as ADRs in [`docs/adr/`](docs/adr/). Before working on a subsystem, read the relevant ADR so you understand the context and constraints behind the current design.
+
+| ADR | Topic |
+| --- | ----- |
+| [`docs/adr/0003-frontend.md`](docs/adr/0003-frontend.md) | Frontend state management and data fetching (`apps/frontend`) |
+
+If your change alters a decision captured in an ADR, update the ADR (or add a new one that supersedes it) in the same PR.
+
 ## Pre-commit Hooks (Husky)
 
 The `.husky/pre-commit` hook runs automatically before every commit. It only checks file types that are staged:

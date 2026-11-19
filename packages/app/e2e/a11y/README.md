@@ -9,9 +9,8 @@ Accessibility testing ensures that our application is usable by everyone, includ
 ## Tools
 
 - **axe-core**: Industry-standard accessibility testing engine
-- **axe-playwright**: Playwright integration for axe-core
-- **@axe-core/react**: React component accessibility testing
-- **jest-axe**: Jest integration for component tests
+- **@axe-core/playwright**: Playwright integration for axe-core (used in E2E tests)
+- **vitest-axe**: Vitest integration for axe-core (used in component tests)
 - **Playwright**: E2E testing framework
 
 ## Test Structure
@@ -24,14 +23,14 @@ packages/app/e2e/a11y/
 └── TESTING_GUIDE.md             # How to write and run a11y tests
 
 apps/frontend/e2e/
-├── accessibility.spec.ts        # Main E2E accessibility tests
+├── accessibility.spec.ts        # Main E2E accessibility tests (tagged @a11y)
 └── a11y/                        # Additional accessibility test suites
     ├── pages/                   # Page-level tests
     ├── components/              # Component-level tests
     └── workflows/               # User workflow tests
 
-apps/frontend/tests/
-└── accessibility.spec.ts        # Component accessibility tests
+apps/frontend/src/
+└── **/*.a11y.test.tsx           # Component accessibility tests (vitest-axe)
 ```
 
 ## Running Tests
@@ -52,18 +51,18 @@ npm run test:e2e -- --grep @a11y
 ```bash
 cd apps/frontend
 
-# E2E accessibility tests
-npx playwright test e2e/accessibility.spec.ts
+# E2E accessibility tests (uses the "a11y" Playwright project)
+npx playwright test --project=a11y
 
-# Component accessibility tests
-npm test tests/accessibility.spec.ts
+# Component accessibility tests (vitest-axe)
+npm test -- --run src/**/*.a11y.test.tsx
 ```
 
 ### With HTML Report
 
 ```bash
 cd apps/frontend
-npx playwright test e2e/accessibility.spec.ts --reporter=html
+npx playwright test --project=a11y --reporter=html
 npx playwright show-report
 ```
 
@@ -187,25 +186,19 @@ PRs with critical accessibility violations **cannot be merged**. The CI workflow
 
 ```typescript
 import { test, expect } from '@playwright/test';
-import { injectAxe, checkA11y } from 'axe-playwright';
+import AxeBuilder from '@axe-core/playwright';
 
 test.describe('Page Accessibility @a11y', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/your-page');
-    await injectAxe(page);
   });
 
   test('should have no critical accessibility violations', async ({ page }) => {
-    await checkA11y(page, null, {
-      detailedReport: true,
-      detailedReportOptions: { html: true },
-      // Only fail on critical and serious violations
-      rules: {
-        'color-contrast': { enabled: true },
-        label: { enabled: true },
-        'button-name': { enabled: true },
-      },
-    });
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+
+    expect(results.violations).toEqual([]);
   });
 });
 ```
@@ -215,12 +208,26 @@ test.describe('Page Accessibility @a11y', () => {
 ```typescript
 test('button should be accessible', async ({ page }) => {
   await page.goto('/page-with-button');
-  await injectAxe(page);
 
   // Check specific element
-  await checkA11y(page, '[data-testid="my-button"]', {
-    detailedReport: true,
-  });
+  const results = await new AxeBuilder({ page })
+    .include('[data-testid="my-button"]')
+    .analyze();
+
+  expect(results.violations).toEqual([]);
+});
+```
+
+### Component Tests with vitest-axe
+
+```tsx
+import { render } from '@testing-library/react';
+import { axe } from 'vitest-axe';
+import { expect, test } from 'vitest';
+
+test('button is accessible', async () => {
+  const { container } = render(<button aria-label="Close">×</button>);
+  expect(await axe(container)).toHaveNoViolations();
 });
 ```
 
@@ -270,11 +277,9 @@ test('should be keyboard navigable', async ({ page }) => {
 If you must suppress a violation:
 
 ```typescript
-await checkA11y(page, null, {
-  rules: {
-    'rule-id': { enabled: false },
-  },
-});
+const results = await new AxeBuilder({ page })
+  .disableRules(['rule-id'])
+  .analyze();
 ```
 
 Document WHY in a comment and create a ticket to fix it.
@@ -358,6 +363,8 @@ Document WHY in a comment and create a ticket to fix it.
 
 - [WCAG 2.1 Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)
 - [axe-core Rules](https://github.com/dequelabs/axe-core/blob/develop/doc/rule-descriptions.md)
+- [@axe-core/playwright](https://github.com/dequelabs/axe-core-npm/tree/develop/packages/playwright)
+- [vitest-axe](https://github.com/chaance/vitest-axe)
 - [ARIA Authoring Practices](https://www.w3.org/WAI/ARIA/apg/)
 
 ### Tools
