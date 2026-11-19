@@ -53,6 +53,13 @@ module.exports = {
   },
   rules: {
     '@typescript-eslint/no-explicit-any': 'error',
+    // Exported functions/components must declare explicit return types and prop interfaces.
+    '@typescript-eslint/explicit-module-boundary-types': 'error',
+    // Prefer `import type { ... }` for type-only imports to keep runtime bundles lean.
+    '@typescript-eslint/consistent-type-imports': [
+      'error',
+      { prefer: 'type-imports', fixStyle: 'separate-type-imports' },
+    ],
     // Debug output must not ship: only console.error (or the project logger) is allowed.
     'no-console': ['error', { allow: ['error'] }],
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
@@ -104,9 +111,12 @@ module.exports = {
   },
   overrides: [
     {
-      // Test files may log while diagnosing failures.
-      files: ['src/__tests__/**/*.{ts,tsx}'],
-      rules: { 'no-console': 'off' },
+      // Test files may log while diagnosing failures and often use loose typing for mocks.
+      files: ['src/__tests__/**/*.{ts,tsx}', '**/*.{spec,test}.{ts,tsx}'],
+      rules: {
+        'no-console': 'off',
+        '@typescript-eslint/explicit-module-boundary-types': 'off',
+      },
     },
     {
       // Entry points are consumed by the framework, not by other modules.
@@ -129,6 +139,11 @@ module.exports = {
         'next-env.d.ts',
       ],
       rules: { 'filenames/match-regex': 'off' },
+    },
+    {
+      // Config files are CommonJS and don't need explicit module boundary types.
+      files: ['*.config.{js,ts}', '.eslintrc.js'],
+      rules: { '@typescript-eslint/explicit-module-boundary-types': 'off' },
     },
   ],
 };

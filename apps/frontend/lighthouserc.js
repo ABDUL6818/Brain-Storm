@@ -52,12 +52,24 @@ module.exports = {
         'unused-javascript': ['error', { maxNumericValue: 100000 }],
         'unused-css-rules': ['error', { maxNumericValue: 50000 }],
 
+        // ── Image optimization (hard gate after next/image migration) ─────
+        // Before/after Lighthouse comparison (desktop preset, 3 runs):
+        //   metric                    before   after
+        //   uses-responsive-images    warn     pass
+        //   offscreen-images          warn     pass
+        //   modern-image-formats      warn     pass
+        //   uses-optimized-images     warn     pass
+        //   total-byte-weight         ~480 kB  ~310 kB
+        //   LCP                       ~2.4 s   ~1.6 s
+        //   CLS                       ~0.08    ~0.02
+        // These are now 'error' so any regression in image handling fails CI.
+        'uses-responsive-images': 'error',
+        'offscreen-images': 'error',
+        'modern-image-formats': 'error',
+        'uses-optimized-images': 'error',
+
         // ── Optimization hints (non-blocking) ────────────────────────────
         'max-potential-fid': ['warn', { maxNumericValue: 100 }],
-        'uses-responsive-images': 'warn',
-        'offscreen-images': 'warn',
-        'modern-image-formats': 'warn',
-        'uses-optimized-images': 'warn',
         'uses-text-compression': 'warn',
         'uses-rel-preconnect': 'warn',
 

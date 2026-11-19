@@ -1,7 +1,7 @@
 'use client';
 
 import { FormProvider, type UseFormReturn, type FieldValues } from 'react-hook-form';
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 
 export interface FormProps<T extends FieldValues> extends Omit<
   React.FormHTMLAttributes<HTMLFormElement>,
@@ -12,23 +12,32 @@ export interface FormProps<T extends FieldValues> extends Omit<
   children: React.ReactNode;
 }
 
-export function Form<T extends FieldValues>({
+function FormInner<T extends FieldValues>({
   form,
   onSubmit,
   children,
   className = '',
   ...rest
 }: FormProps<T>) {
+  const handleSubmit = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      void form.handleSubmit(onSubmit)(event);
+    },
+    [form, onSubmit],
+  );
+
+  const formClassName = useMemo(() => `space-y-4 ${className}`, [className]);
+
   return (
     <FormProvider {...form}>
-      <form
-        noValidate
-        onSubmit={form.handleSubmit(onSubmit)}
-        className={`space-y-4 ${className}`}
-        {...rest}
-      >
+      <form noValidate onSubmit={handleSubmit} className={formClassName} {...rest}>
         {children}
       </form>
     </FormProvider>
   );
 }
+
+export const Form = React.memo(FormInner) as typeof FormInner;
+</｜｜DSML｜｜ parameter>
+</｜｜DSML｜｜ invoke>
+</｜｜DSML｜｜ calls>
