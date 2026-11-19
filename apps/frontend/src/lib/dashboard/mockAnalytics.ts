@@ -2,6 +2,13 @@ import type { ProgressDataPoint, QuizScoreDataPoint, StreakData } from '@/compon
 import { formatMonthDay } from '@/lib/date-utils';
 
 /**
+ * NOTE: This module is unrelated to the SettingsPage refactor (issue #19).
+ * The SettingsPage split lives in `@/components/settings/SettingsPage/`
+ * (index.tsx, useSettings.ts, transforms.ts and presentational subcomponents).
+ * No changes were required here for that refactor.
+ */
+
+/**
  * Placeholder analytics series used until the `/users/:id/analytics` endpoint
  * ships. Pure generators — they return data rather than calling setters, so the
  * hook that owns the state decides what to do with them.

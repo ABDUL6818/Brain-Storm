@@ -7,6 +7,8 @@
  * Shared with the SDK layer: import from '@/components/features/token-restrictions/schema'
  */
 
+import { z } from 'zod';
+
 // ---------------------------------------------------------------------------
 // Primitive value types a restriction can carry
 // ---------------------------------------------------------------------------
@@ -68,6 +70,84 @@ export const RESTRICTION_RULES: RestrictionRule[] = [
     badgeClass: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Zod schemas for restriction values — shared with forms via zodResolver
+// ---------------------------------------------------------------------------
+
+/** Amount: non-negative finite number (accepts numeric strings from inputs). */
+export const amountValueSchema = z.coerce
+  .number({ invalid_type_error: 'Amount must be a number' })
+  .finite('Amount must be a finite number')
+  .nonnegative('Amount must be zero or greater');
+
+/** Address: non-empty string, optionally validated as a Stellar-style address. */
+export const addressValueSchema = z
+  .string()
+  .trim()
+  .min(1, 'Address is required')
+  .max(128, 'Address is too long');
+
+/** Percentage: number between 0 and 100 inclusive. */
+export const percentageValueSchema = z.coerce
+  .number({ invalid_type_error: 'Percentage must be a number' })
+  .finite('Percentage must be a finite number')
+  .min(0, 'Percentage must be at least 0')
+  .max(100, 'Percentage must be at most 100');
+
+/** Duration: non-negative integer number of seconds. */
+export const durationValueSchema = z.coerce
+  .number({ invalid_type_error: 'Duration must be a number' })
+  .int('Duration must be a whole number of seconds')
+  .nonnegative('Duration must be zero or greater');
+
+/** Boolean: accepts real booleans or the strings "true"/"false" from inputs. */
+export const booleanValueSchema = z
+  .union([z.boolean(), z.enum(['true', 'false'])])
+  .transform((v) => (typeof v === 'boolean' ? v : v === 'true'));
+
+/** Map of valueType → schema, so forms can pick the right validator by rule. */
+export const RESTRICTION_VALUE_SCHEMAS = {
+  amount: amountValueSchema,
+  address: addressValueSchema,
+  percentage: percentageValueSchema,
+  duration: durationValueSchema,
+  boolean: booleanValueSchema,
+} as const satisfies Record<RestrictionValueType, z.ZodTypeAny>;
+
+/** Return the zod schema for a given restriction value type. */
+export function getValueSchema(valueType: RestrictionValueType): z.ZodTypeAny {
+  return RESTRICTION_VALUE_SCHEMAS[valueType];
+}
+
+/** Schema for a single restriction entry (key + value validated by its rule). */
+export const restrictionEntrySchema = z
+  .object({
+    key: z.string().min(1, 'Restriction key is required'),
+    value: z.unknown(),
+  })
+  .superRefine((entry, ctx) => {
+    const rule = findRule(entry.key);
+    if (!rule) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['key'],
+        message: `Unknown restriction key: ${entry.key}`,
+      });
+      return;
+    }
+    const result = getValueSchema(rule.valueType).safeParse(entry.value);
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        ctx.addIssue({ ...issue, path: ['value', ...issue.path] });
+      }
+    }
+  });
+
+/** Schema for a full set of restriction entries. */
+export const restrictionEntriesSchema = z.array(restrictionEntrySchema);
+
+export type RestrictionEntry = z.infer<typeof restrictionEntrySchema>;
 
 // ---------------------------------------------------------------------------
 // Helpers

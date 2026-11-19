@@ -5,6 +5,8 @@ import type {
   CredentialRecord,
   DashboardStats,
   EnrolledCourse,
+  LeaderboardEntry,
+  LeaderboardSortKey,
   ProgressRecord,
 } from './types';
 import type {
@@ -132,129 +134,44 @@ export function applyProgressUpdate(
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* LessonViewer transforms                                                    */
-/* -------------------------------------------------------------------------- */
-
-/** Maps a raw progress percentage to a coarse lesson status. */
-export function toLessonStatus(progressPct: number): LessonProgressStatus {
-  if (progressPct >= COMPLETE_PCT) return 'completed';
-  if (progressPct > 0) return 'in-progress';
-  return 'not-started';
-}
-
-/** Normalises the loosely-typed lesson payload from the API. */
-export function toLessonList(raw: unknown): LessonListItem[] {
+/** Normalises the loosely-typed leaderboard payload from the API. */
+export function toLeaderboardEntries(raw: unknown): LeaderboardEntry[] {
   if (!Array.isArray(raw)) return [];
-  return raw.map((lesson, index) => {
-    const progressPct = lesson.progressPct ?? 0;
-    return {
-      id: lesson.id,
-      title: lesson.title ?? `Lesson ${index + 1}`,
-      order: lesson.order ?? index + 1,
-      durationMinutes: lesson.durationMinutes ?? 0,
-      progressPct,
-      status: toLessonStatus(progressPct),
-    };
-  });
+  return raw.map((entry, index) => ({
+    id: entry.id ?? `entry-${index}`,
+    rank: entry.rank ?? index + 1,
+    name: entry.name ?? entry.username ?? 'Anonymous',
+    score: entry.score ?? entry.points ?? 0,
+    avatarUrl: entry.avatarUrl ?? entry.avatar ?? undefined,
+    isCurrentUser: Boolean(entry.isCurrentUser),
+  }));
 }
 
-/** Sorts a copy of `lessons` by their `order` ascending. */
-export function sortLessonsByOrder(lessons: LessonListItem[]): LessonListItem[] {
-  return [...lessons].sort((a, b) => a.order - b.order);
+/** Sorts a copy of `entries`; descending score or ascending rank. */
+export function sortLeaderboardEntries(
+  entries: LeaderboardEntry[],
+  sort: LeaderboardSortKey
+): LeaderboardEntry[] {
+  const sorted = [...entries];
+  if (sort === 'rank') return sorted.sort((a, b) => a.rank - b.rank);
+  return sorted.sort((a, b) => b.score - a.score);
 }
 
-/** Overall course progress derived from the lesson list (0 when empty). */
-export function computeLessonProgress(lessons: LessonListItem[]): number {
-  if (lessons.length === 0) return 0;
-  const total = lessons.reduce((acc, l) => acc + l.progressPct, 0);
-  return Math.round(total / lessons.length);
+/** Re-derives rank positions from the current ordering (1-based). */
+export function assignRanks(entries: LeaderboardEntry[]): LeaderboardEntry[] {
+  return entries.map((entry, index) => ({ ...entry, rank: index + 1 }));
 }
 
-/* -------------------------------------------------------------------------- */
-/* CredentialView transforms                                                  */
-/* -------------------------------------------------------------------------- */
-
-/** Maps a verification flag/payload to a display status. */
-export function toVerificationStatus(raw: unknown): CredentialVerificationStatus {
-  if (raw === true || raw === 'verified') return 'verified';
-  if (raw === 'pending') return 'pending';
-  if (raw === false || raw === 'failed') return 'failed';
-  return 'unverified';
+/** Returns the top `limit` entries after sorting by score. */
+export function topLeaderboardEntries(
+  entries: LeaderboardEntry[],
+  limit: number
+): LeaderboardEntry[] {
+  if (limit <= 0) return [];
+  return sortLeaderboardEntries(entries, 'score').slice(0, limit);
 }
 
-/** Formats an ISO date for display; returns an empty string when invalid. */
-export function formatIssuedAt(issuedAt: string): string {
-  const date = new Date(issuedAt);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-/** Maps a credential record to its presentational shape. */
-export function toCredentialDisplay(record: CredentialRecord): CredentialDisplay {
-  const raw = record as CredentialRecord & { verified?: unknown };
-  return {
-    id: record.id,
-    title: record.course?.title ?? `Credential ${record.id}`,
-    issuedAt: record.issuedAt,
-    issuedAtLabel: formatIssuedAt(record.issuedAt),
-    verification: toVerificationStatus(raw.verified),
-  };
-}
-
-/** Maps a list of credential records to display shapes. */
-export function toCredentialDisplays(records: CredentialRecord[]): CredentialDisplay[] {
-  return records.map(toCredentialDisplay);
-}
-
-/* -------------------------------------------------------------------------- */
-/* ProfileForm transforms                                                     */
-/* -------------------------------------------------------------------------- */
-
-export const EMPTY_PROFILE_FORM: ProfileFormValues = {
-  name: '',
-  email: '',
-  bio: '',
-};
-
-/** Maps an API profile response to form values. */
-export function toProfileFormValues(raw: ProfileResponse | null | undefined): ProfileFormValues {
-  if (!raw) return { ...EMPTY_PROFILE_FORM };
-  return {
-    name: raw.name ?? '',
-    email: raw.email ?? '',
-    bio: raw.bio ?? '',
-  };
-}
-
-/** Maps form values to the API payload, trimming whitespace. */
-export function toProfilePayload(values: ProfileFormValues): ProfilePayload {
-  return {
-    name: values.name.trim(),
-    email: values.email.trim(),
-    bio: values.bio.trim(),
-  };
-}
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** Validates profile form values, returning per-field error messages. */
-export function validateProfileForm(values: ProfileFormValues): ProfileFieldErrors {
-  const errors: ProfileFieldErrors = {};
-  if (!values.name.trim()) errors.name = 'Name is required';
-  if (!values.email.trim()) {
-    errors.email = 'Email is required';
-  } else if (!EMAIL_PATTERN.test(values.email.trim())) {
-    errors.email = 'Email is invalid';
-  }
-  return errors;
-}
-
-/** True when the validation result contains no errors. */
-export function isProfileFormValid(errors: ProfileFieldErrors): boolean {
-  return Object.keys(errors).length === 0;
+/** Formats a leaderboard score for display (e.g. 1200 -> "1,200"). */
+export function formatLeaderboardScore(score: number): string {
+  return new Intl.NumberFormat('en-US').format(score);
 }

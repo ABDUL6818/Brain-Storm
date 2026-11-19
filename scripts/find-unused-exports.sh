@@ -42,47 +42,75 @@ echo ""
 # Find all exported items
 echo -e "${YELLOW}📋 Finding all exports...${NC}"
 
-# Extract all export names
+# Extract all exports as "<relative/path/to/file.ts>:<line>:<exportName>"
+# This is the format consumed by scripts/remove-unused-exports.sh.
 : > /tmp/all_exports.txt
 for ws in "${EXISTING_WORKSPACES[@]}"; do
-    find "$ws" -name "*.ts" -type f -exec grep -E "^(export )?(const|function|class|interface|type|enum|let|var)" {} \; 2>/dev/null | \
-      sed -E 's/^(export )?(const|function|class|interface|type|enum|let|var) ([a-zA-Z_][a-zA-Z0-9_]*).*/\3/' >> /tmp/all_exports.txt
+    while IFS= read -r file; do
+        # Strip leading "./" so paths are workspace-relative
+        rel_file="${file#./}"
+        grep -nE "^(export )?(const|function|class|interface|type|enum|let|var) [a-zA-Z_][a-zA-Z0-9_]*" "$file" 2>/dev/null | \
+          awk -v f="$rel_file" -F: '{
+              line = $1
+              rest = $0
+              sub(/^[0-9]+:/, "", rest)
+              sub(/^export /, "", rest)
+              sub(/^(const|function|class|interface|type|enum|let|var) /, "", rest)
+              match(rest, /^[a-zA-Z_][a-zA-Z0-9_]*/)
+              name = substr(rest, RSTART, RLENGTH)
+              if (name != "") print f ":" line ":" name
+          }' >> /tmp/all_exports.txt
+    done < <(find "$ws" -name "*.ts" -type f \
+        -not -path "*/node_modules/*" \
+        -not -path "*/dist/*" \
+        -not -path "*/build/*" \
+        -not -path "*/.next/*" 2>/dev/null)
 done
 sort -u /tmp/all_exports.txt -o /tmp/all_exports.txt
 
 TOTAL_EXPORTS=$(wc -l < /tmp/all_exports.txt)
 echo -e "  ${GREEN}Found $TOTAL_EXPORTS total exports${NC}"
 
-# Check each export for usage outside its defining workspace
+# Check each export for usage outside its defining file
 echo ""
 echo -e "${YELLOW}📋 Checking for unused exports...${NC}"
 
 USED_EXPORTS=()
 UNUSED_EXPORTS=()
 
-while read -r export_name; do
+while IFS= read -r entry; do
+    if [ -z "$entry" ]; then
+        continue
+    fi
+
+    # entry format: <relative/path/to/file.ts>:<line>:<exportName>
+    export_name="${entry##*:}"
+    defining_file="${entry%:*:*}"
+    defining_file="${defining_file%:*}"
+
     if [ -z "$export_name" ]; then
         continue
     fi
 
-    # Count usage outside the workspace directories
-    USAGE_COUNT=$(grep -r "$export_name" . --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" \
+    # Count usages of the export name in files other than its defining file
+    USAGE_COUNT=$(grep -r "\b${export_name}\b" . --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" \
         --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.next 2>/dev/null | \
         grep -v "node_modules" | \
+        grep -v "^\./${defining_file}:" | \
         wc -l)
 
     if [ "$USAGE_COUNT" -eq 0 ]; then
-        UNUSED_EXPORTS+=("$export_name")
-        echo -e "  ${RED}❌ Unused export: $export_name${NC}"
+        UNUSED_EXPORTS+=("$entry")
+        echo -e "  ${RED}❌ Unused export: $entry${NC}"
     else
-        USED_EXPORTS+=("$export_name")
+        USED_EXPORTS+=("$entry")
     fi
 done < /tmp/all_exports.txt
 
-# Write unused exports list for scripts/remove-unused-exports.sh
+# Write unused exports list (file:line:name) for scripts/remove-unused-exports.sh
 : > /tmp/unused_exports.txt
-for export_name in "${UNUSED_EXPORTS[@]}"; do
-    echo "$export_name" >> /tmp/unused_exports.txt
+for entry in "${UNUSED_EXPORTS[@]}"; do
+    echo "$entry" >> /tmp/unused_exports.txt
 done
 
 TOTAL_UNUSED=${#UNUSED_EXPORTS[@]}
@@ -96,8 +124,8 @@ echo -e "  ${RED}Unused exports: $TOTAL_UNUSED${NC}"
 if [ $TOTAL_UNUSED -gt 0 ]; then
     echo ""
     echo -e "${YELLOW}Unused exports to remove:${NC}"
-    for export_name in "${UNUSED_EXPORTS[@]}"; do
-        echo "  - $export_name"
+    for entry in "${UNUSED_EXPORTS[@]}"; do
+        echo "  - $entry"
     done
 fi
 

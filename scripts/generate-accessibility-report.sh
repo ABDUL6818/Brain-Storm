@@ -16,8 +16,13 @@ if [ ! -f "$TEST_RESULTS" ]; then
   exit 1
 fi
 
-# Read results
+# Read and validate results
 RESULTS=$(cat "$TEST_RESULTS")
+
+if ! echo "$RESULTS" | jq -e '.tests | type == "array"' > /dev/null 2>&1; then
+  echo "❌ Invalid test results: expected a JSON object with a 'tests' array"
+  exit 1
+fi
 
 # Generate HTML report
 cat > "$OUTPUT_FILE" << 'EOF'
@@ -276,6 +281,10 @@ cat > "$OUTPUT_FILE" << 'EOF'
     </div>
     
     <script>
+        const TEST_RESULTS_DATA = TEST_RESULTS_JSON;
+    </script>
+    
+    <script>
         const results = TEST_RESULTS_DATA;
         
         // Update header
@@ -317,16 +326,24 @@ cat > "$OUTPUT_FILE" << 'EOF'
             testsContainer.appendChild(card);
         });
     </script>
-    
-    <script>
-        const TEST_RESULTS_DATA = TEST_RESULTS_JSON;
-    </script>
 </body>
 </html>
 EOF
 
-# Replace placeholder with actual results
+# Replace placeholder with actual results (portable temp-file approach)
 RESULTS_JSON=$(echo "$RESULTS" | jq -c '.')
-sed -i "s|TEST_RESULTS_JSON|$RESULTS_JSON|g" "$OUTPUT_FILE"
+TMP_FILE=$(mktemp)
+trap 'rm -f "$TMP_FILE"' EXIT
+
+# Use awk to avoid sed delimiter/regex issues with arbitrary JSON content
+awk -v json="$RESULTS_JSON" '
+  {
+    gsub(/TEST_RESULTS_JSON/, json)
+    print
+  }
+' "$OUTPUT_FILE" > "$TMP_FILE"
+
+mv "$TMP_FILE" "$OUTPUT_FILE"
+trap - EXIT
 
 echo "✅ Report generated: $OUTPUT_FILE"

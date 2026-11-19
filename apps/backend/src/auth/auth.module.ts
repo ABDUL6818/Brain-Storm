@@ -6,6 +6,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { UsersModule } from '../users/users.module';
 import { MailModule } from '../mail/mail.module';
 import { AuthService } from './auth.service';
+import { AuthRepository } from './auth.repository';
 import { StellarAuthService } from './stellar-auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
@@ -38,6 +39,7 @@ import { AuditModule } from '../audit/audit.module';
     }),
   ],
   providers: [
+    AuthRepository,
     AuthService,
     StellarAuthService,
     JwtStrategy,
@@ -49,6 +51,6 @@ import { AuditModule } from '../audit/audit.module';
     TokenBlacklistService,
   ],
   controllers: [AuthController],
-  exports: [JwtAuthGuard, RolesGuard, ApiKeyAuthGuard, TokenBlacklistService],
+  exports: [JwtAuthGuard, RolesGuard, ApiKeyAuthGuard, TokenBlacklistService, AuthRepository],
 })
 export class AuthModule {}
