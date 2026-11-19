@@ -77,6 +77,18 @@ npm run test -- --grep="useNotifications"
 # Run only changed tests
 
 npm run test -- --changed
+
+# Run a single component's tests (e.g. after splitting CourseList)
+
+npm run test -- src/**tests**/components/CourseList
+
+# Run a single hook's tests
+
+npm run test -- src/**tests**/hooks/useCourseList.test.ts
+
+# Run a single utility module's tests
+
+npm run test -- src/**tests**/utils/courseList.test.ts
 \`\`\`
 
 ### CI/CD
@@ -142,6 +154,65 @@ render(<CourseCard course={mockCourse} onEnroll={mockEnroll} />);
     await userEvent.click(screen.getByText('Enroll'));
     expect(mockEnroll).toHaveBeenCalledWith(mockCourse.id);
 
+});
+});
+\`\`\`
+
+### Presentational Subcomponents
+
+When a container component (e.g. `CourseList`) is split into presentational
+subcomponents plus a custom hook, test each piece in isolation:
+
+- **Presentational subcomponents**: render them with plain props and assert on
+  the rendered output. No data fetching or hooks involved.
+- **Custom hook**: test with `renderHook` and mock the data source.
+- **Container/wrapper**: test the thin wrapper only for wiring (that it passes
+  props through and renders the expected subcomponents).
+
+\`\`\`typescript
+// Presentational subcomponent — pure props in, DOM out
+describe('CourseListEmpty', () => {
+it('renders the empty state message', () => {
+render(<CourseListEmpty message="No courses yet" />);
+expect(screen.getByText('No courses yet')).toBeInTheDocument();
+});
+});
+
+// Custom hook — mock the data source, assert on returned state
+describe('useCourseList', () => {
+it('returns courses from the data source', async () => {
+vi.mock('@/lib/courseApi', () => ({
+fetchCourses: vi.fn().mockResolvedValue([{ id: '1', title: 'Blockchain 101' }]),
+}));
+
+    const { result } = renderHook(() => useCourseList());
+
+    await waitFor(() => {
+      expect(result.current.courses).toHaveLength(1);
+    });
+    expect(result.current.isLoading).toBe(false);
+
+});
+});
+\`\`\`
+
+### Pure Utility Tests
+
+Data transforms extracted from components into utility modules should be tested
+directly as pure functions — no rendering required.
+
+\`\`\`typescript
+import { transformCourses, filterCourses } from '@/utils/courseList';
+
+describe('courseList utils', () => {
+it('transforms raw courses into view models', () => {
+const result = transformCourses([{ id: '1', title: 'A', price: 10 }]);
+expect(result).toEqual([{ id: '1', title: 'A', formattedPrice: '$10.00' }]);
+});
+
+it('filters courses by search term', () => {
+const courses = [{ id: '1', title: 'Blockchain' }, { id: '2', title: 'React' }];
+expect(filterCourses(courses, 'block')).toHaveLength(1);
 });
 });
 \`\`\`
@@ -437,6 +508,16 @@ open coverage/index.html
 - **HTML**: Interactive browsing
 - **JSON**: Programmatic analysis
 
+### Coverage for Refactored Components
+
+When a component is split into subcomponents + a hook + utilities (e.g.
+`CourseList`), each new module needs its own tests. Aim for 85%+ coverage on
+the new modules. To check coverage for just the refactored area:
+
+\`\`\`bash
+npm run test:coverage -- src/components/CourseList src/hooks/useCourseList.ts src/utils/courseList.ts
+\`\`\`
+
 ## Best Practices
 
 ### Do's ✅
@@ -492,6 +573,45 @@ return render(
 it('renders with theme', () => {
 renderWithProviders(<MyComponent />);
 // assertions...
+});
+\`\`\`
+
+#### Testing a Split Component (Container + Subcomponents + Hook)
+
+When a component is refactored into a thin container, presentational
+subcomponents, a custom hook, and utilities, test each layer separately:
+
+\`\`\`typescript
+// 1. Utilities — pure functions, no rendering
+describe('courseList utils', () => {
+it('sorts courses by title', () => {
+expect(sortCourses([{ title: 'B' }, { title: 'A' }])[0].title).toBe('A');
+});
+});
+
+// 2. Hook — mock the data source
+describe('useCourseList', () => {
+it('exposes loading then data', async () => {
+const { result } = renderHook(() => useCourseList());
+expect(result.current.isLoading).toBe(true);
+await waitFor(() => expect(result.current.isLoading).toBe(false));
+});
+});
+
+// 3. Subcomponent — props in, DOM out
+describe('CourseListEmpty', () => {
+it('renders empty message', () => {
+render(<CourseListEmpty message="No courses" />);
+expect(screen.getByText('No courses')).toBeInTheDocument();
+});
+});
+
+// 4. Container — verify wiring only
+describe('CourseList', () => {
+it('renders subcomponents from hook data', async () => {
+render(<CourseList />);
+await waitFor(() => expect(screen.getByRole('list')).toBeInTheDocument());
+});
 });
 \`\`\`
 
