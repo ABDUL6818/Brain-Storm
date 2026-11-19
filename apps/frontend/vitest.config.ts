@@ -28,6 +28,13 @@ export default defineConfig({
         '**/mockData',
         '**/__mocks__/**',
         'src/app', // Next.js pages
+        // Route-level lazy loading wrappers and error files are exercised via
+        // smoke render tests; keep them out of coverage accounting since they
+        // are thin dynamic-import/error-boundary shims.
+        'src/app/**/loading.tsx',
+        'src/app/**/error.tsx',
+        'src/app/**/not-found.tsx',
+        'src/components/lazy/**',
       ],
       thresholds: {
         lines: 85,

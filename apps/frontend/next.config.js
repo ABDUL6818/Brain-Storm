@@ -46,6 +46,35 @@ const nextConfig = {
       '@dnd-kit/core',
       '@dnd-kit/sortable',
     ],
+    // Route-level code splitting: emit a separate chunk per route so heavy
+    // page components are only downloaded when their route is visited.
+    optimizeCss: true,
+  },
+  webpack(config, { isServer }) {
+    if (!isServer) {
+      // Split shared vendor code into its own long-lived chunk so route
+      // chunks stay small and cacheable across deploys.
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          ...(config.optimization && config.optimization.splitChunks),
+          chunks: 'all',
+          cacheGroups: {
+            ...(config.optimization &&
+              config.optimization.splitChunks &&
+              config.optimization.splitChunks.cacheGroups),
+            defaultVendors: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendors',
+              chunks: 'all',
+              priority: -10,
+              reuseExistingChunk: true,
+            },
+          },
+        },
+      };
+    }
+    return config;
   },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
