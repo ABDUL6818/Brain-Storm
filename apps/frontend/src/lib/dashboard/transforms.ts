@@ -5,8 +5,20 @@ import type {
   CredentialRecord,
   DashboardStats,
   EnrolledCourse,
+  LeaderboardEntry,
+  LeaderboardSortKey,
   ProgressRecord,
 } from './types';
+import type {
+  CredentialDisplay,
+  CredentialVerificationStatus,
+  LessonListItem,
+  LessonProgressStatus,
+  ProfileFieldErrors,
+  ProfileFormValues,
+  ProfilePayload,
+  ProfileResponse,
+} from './viewerTypes';
 
 /**
  * Pure transforms behind the dashboard. Keeping them out of the components makes
@@ -120,4 +132,46 @@ export function applyProgressUpdate(
   return progress.map((p) =>
     p.courseId === update.courseId ? { ...p, progressPct: update.progressPct } : p
   );
+}
+
+/** Normalises the loosely-typed leaderboard payload from the API. */
+export function toLeaderboardEntries(raw: unknown): LeaderboardEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((entry, index) => ({
+    id: entry.id ?? `entry-${index}`,
+    rank: entry.rank ?? index + 1,
+    name: entry.name ?? entry.username ?? 'Anonymous',
+    score: entry.score ?? entry.points ?? 0,
+    avatarUrl: entry.avatarUrl ?? entry.avatar ?? undefined,
+    isCurrentUser: Boolean(entry.isCurrentUser),
+  }));
+}
+
+/** Sorts a copy of `entries`; descending score or ascending rank. */
+export function sortLeaderboardEntries(
+  entries: LeaderboardEntry[],
+  sort: LeaderboardSortKey
+): LeaderboardEntry[] {
+  const sorted = [...entries];
+  if (sort === 'rank') return sorted.sort((a, b) => a.rank - b.rank);
+  return sorted.sort((a, b) => b.score - a.score);
+}
+
+/** Re-derives rank positions from the current ordering (1-based). */
+export function assignRanks(entries: LeaderboardEntry[]): LeaderboardEntry[] {
+  return entries.map((entry, index) => ({ ...entry, rank: index + 1 }));
+}
+
+/** Returns the top `limit` entries after sorting by score. */
+export function topLeaderboardEntries(
+  entries: LeaderboardEntry[],
+  limit: number
+): LeaderboardEntry[] {
+  if (limit <= 0) return [];
+  return sortLeaderboardEntries(entries, 'score').slice(0, limit);
+}
+
+/** Formats a leaderboard score for display (e.g. 1200 -> "1,200"). */
+export function formatLeaderboardScore(score: number): string {
+  return new Intl.NumberFormat('en-US').format(score);
 }

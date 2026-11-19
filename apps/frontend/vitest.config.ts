@@ -9,15 +9,25 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/__tests__/setup.ts'],
+    include: [
+      'src/**/*.{test,spec}.{ts,tsx}',
+      'src/**/__tests__/**/*.{test,spec}.{ts,tsx}',
+      'src/**/*.test.{ts,tsx}',
+    ],
     exclude: ['**/node_modules/**', '**/e2e/**', '**/*.pact.test.ts'],
+    include: [
+      'src/**/*.{test,spec}.{ts,tsx}',
+      'src/**/__tests__/**/*.{test,spec}.{ts,tsx}',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html', 'json-summary'],
       include: [
-        'src/components/**/*.{ts,tsx}',
         'src/hooks/**/*.{ts,tsx}',
-        'src/utils/**/*.{ts,tsx}',
-        'src/lib/**/*.{ts,tsx}',
+        'src/config/**/*.{ts,tsx}',
+        'src/components/**/*.{ts,tsx}',
+        'src/services/**/*.{ts,tsx}',
+        'src/theme/**/*.{ts,tsx}',
       ],
       exclude: [
         'node_modules/',
@@ -28,10 +38,20 @@ export default defineConfig({
         '**/*.d.ts',
         '**/*.config.*',
         '**/mockData',
-        '**/mocks/**',
-        '**/fixtures/**',
-        '**/index.{ts,tsx}',
+        '**/__mocks__/**',
         'src/app', // Next.js pages
+        // Route-level lazy loading wrappers and error files are exercised via
+        // smoke render tests; keep them out of coverage accounting since they
+        // are thin dynamic-import/error-boundary shims.
+        'src/app/**/loading.tsx',
+        'src/app/**/error.tsx',
+        'src/app/**/not-found.tsx',
+        'src/components/lazy/**',
+      ],
+      include: [
+        'src/lib/i18n/**',
+        'src/lib/**/*.{ts,tsx}',
+        'src/components/**/*.{ts,tsx}',
       ],
       thresholds: {
         lines: 85,
