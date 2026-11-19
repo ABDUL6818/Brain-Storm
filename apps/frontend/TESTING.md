@@ -401,6 +401,7 @@ The refactored modules — `LessonViewer`, `WalletConnect`, `CredentialView` and
 ## Coverage Requirements
 
 ### Enforcement
+=======
 
 Coverage thresholds are enforced in CI:
 
