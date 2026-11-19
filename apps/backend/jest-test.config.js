@@ -1,6 +1,7 @@
 /**
- * Jest configuration for all unit and integration tests matching *.test.ts.
- * This covers tests added by Issues #842 and #843.
+ * Jest configuration for all unit and integration tests matching *.test.ts and *.spec.ts.
+ * This covers tests added by Issues #842, #843 and the module modularization
+ * work (Issues #37, #38, #39, #40).
  */
 module.exports = {
   moduleFileExtensions: ['js', 'json', 'ts'],

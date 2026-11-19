@@ -24,6 +24,12 @@ import { CourseSchedulerService } from './course-scheduler.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CacheManagementModule } from '../cache/cache-management.module';
 import { RepositoriesModule } from '../repositories';
+import { CoursesRepository } from './repositories/courses.repository';
+import { LessonsRepository } from './repositories/lessons.repository';
+import { ModulesRepository } from './repositories/modules.repository';
+import { ReviewsRepository } from './repositories/reviews.repository';
+import { PrerequisitesRepository } from './repositories/prerequisites.repository';
+import { CourseVersioningRepository } from './repositories/course-versioning.repository';
 
 @Module({
   imports: [
@@ -42,6 +48,12 @@ import { RepositoriesModule } from '../repositories';
     RepositoriesModule,
   ],
   providers: [
+    CoursesRepository,
+    LessonsRepository,
+    ModulesRepository,
+    ReviewsRepository,
+    PrerequisitesRepository,
+    CourseVersioningRepository,
     CoursesService,
     CoursesBusinessService,
     ModulesService,
@@ -58,6 +70,14 @@ import { RepositoriesModule } from '../repositories';
     CourseVersioningController,
     PrerequisitesController,
   ],
-  exports: [CoursesService, CoursesBusinessService, PrerequisitesService],
+  exports: [
+    CoursesService,
+    CoursesBusinessService,
+    PrerequisitesService,
+    LessonsService,
+    ModulesService,
+    ReviewsService,
+    CourseVersioningService,
+  ],
 })
 export class CoursesModule {}

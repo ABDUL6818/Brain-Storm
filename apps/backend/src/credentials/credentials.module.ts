@@ -11,6 +11,7 @@ import { CoursesModule } from '../courses/courses.module';
 import { CertificateRenderer } from './certificate-pdf.service';
 import { UsersModule } from '../users/users.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
+import { CredentialsRepository } from './credentials.repository';
 
 @Module({
   imports: [
@@ -21,7 +22,12 @@ import { RepositoriesModule } from '../repositories/repositories.module';
     UsersModule,
     RepositoriesModule,
   ],
-  providers: [CredentialsService, CertificateRenderer, BadgeAwardService],
+  providers: [
+    CredentialsRepository,
+    CredentialsService,
+    CertificateRenderer,
+    BadgeAwardService,
+  ],
   controllers: [CredentialsController, PublicCredentialVerificationController],
   exports: [CredentialsService, BadgeAwardService],
 })
