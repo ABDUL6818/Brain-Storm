@@ -1,6 +1,8 @@
 import { Skeleton, CourseListSkeleton } from '@/components/ui/Skeleton';
 
 export default function CoursesLoading() {
+  const t = useTranslations('courses.loading');
+
   return (
     <div className="max-w-5xl mx-auto p-8 space-y-6">
       <div className="space-y-2">

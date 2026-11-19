@@ -36,6 +36,11 @@ export default defineConfig({
         'src/app/**/not-found.tsx',
         'src/components/lazy/**',
       ],
+      include: [
+        'src/lib/i18n/**',
+        'src/lib/**/*.{ts,tsx}',
+        'src/components/**/*.{ts,tsx}',
+      ],
       thresholds: {
         lines: 85,
         functions: 85,
