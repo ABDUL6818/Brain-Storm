@@ -9,7 +9,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
-import { AuthModule } from './auth/auth.module';
+import { AuthModule } from './auth';
 import { CoursesModule } from './courses/courses.module';
 import { UsersModule } from './users';
 import { StellarModule } from './stellar/stellar.module';

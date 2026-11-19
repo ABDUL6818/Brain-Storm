@@ -5,38 +5,21 @@ import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { StellarAuthService } from './stellar-auth.service';
-import { IsEmail, IsString, MinLength, IsOptional } from 'class-validator';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { Roles } from './roles.decorator';
 import { RolesGuard } from './roles.guard';
-
-class AuthDto {
-  @IsEmail() email: string;
-  @IsString() @MinLength(8) password: string;
-}
-
-class LoginDto extends AuthDto {
-  @IsString()
-  @IsOptional()
-  mfa_token?: string;
-}
-
-class ResendVerificationDto {
-  @IsEmail() email: string;
-}
-
-class ForgotPasswordDto {
-  @IsEmail() email: string;
-}
-
-class ResetPasswordDto {
-  @IsString() token: string;
-  @IsString() @MinLength(8) newPassword: string;
-}
-
-class RefreshDto {
-  @IsString() refresh_token: string;
-}
+import { AuthDto } from './dto/auth.dto';
+import { LoginDto } from './dto/login.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { RefreshDto } from './dto/refresh.dto';
+import { LogoutDto } from './dto/logout.dto';
+import { MfaCodeDto } from './dto/mfa-code.dto';
+import { GenerateApiKeyDto } from './dto/generate-api-key.dto';
+import { RevokeApiKeyDto } from './dto/revoke-api-key.dto';
+import { StellarChallengeDto } from './dto/stellar-challenge.dto';
+import { StellarVerifyDto } from './dto/stellar-verify.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -111,7 +94,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Logout and invalidate refresh token' })
   @ApiBody({ schema: { example: { refresh_token: 'token', access_token: 'jwt' } } })
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
-  logout(@Body() dto: { refresh_token: string; access_token?: string }) {
+  logout(@Body() dto: LogoutDto) {
     return this.authService.logout(dto.refresh_token, undefined, dto.access_token);
   }
 
@@ -159,35 +142,35 @@ export class AuthController {
 
   @Post('mfa/verify')
   @UseGuards(JwtAuthGuard)
-  verifyMfa(@Req() req: Request, @Body('code') code: string) {
-    return this.authService.verifyMfaSecret(req.user!.id, code);
+  verifyMfa(@Req() req: Request, @Body() dto: MfaCodeDto) {
+    return this.authService.verifyMfaSecret(req.user!.id, dto.code);
   }
 
   @Post('mfa/disable')
   @UseGuards(JwtAuthGuard)
-  disableMfa(@Req() req: Request, @Body('code') code: string) {
-    return this.authService.disableMfa(req.user!.id, code);
+  disableMfa(@Req() req: Request, @Body() dto: MfaCodeDto) {
+    return this.authService.disableMfa(req.user!.id, dto.code);
   }
 
   @Post('mfa/backup-codes/regenerate')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Regenerate backup codes (requires valid TOTP)' })
-  regenerateBackupCodes(@Req() req: Request, @Body('code') code: string) {
-    return this.authService.regenerateBackupCodes(req.user!.id, code);
+  regenerateBackupCodes(@Req() req: Request, @Body() dto: MfaCodeDto) {
+    return this.authService.regenerateBackupCodes(req.user!.id, dto.code);
   }
 
   @Post('admin/api-keys')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  generateApiKey(@Body('userId') userId: string, @Body('name') name: string) {
-    return this.authService.generateApiKey(userId, name);
+  generateApiKey(@Body() dto: GenerateApiKeyDto) {
+    return this.authService.generateApiKey(dto.userId, dto.name);
   }
 
   @Post('admin/api-keys/revoke')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  revokeApiKey(@Body('id') id: string) {
-    return this.authService.revokeApiKey(id);
+  revokeApiKey(@Body() dto: RevokeApiKeyDto) {
+    return this.authService.revokeApiKey(dto.id);
   }
 
   @Post('stellar-challenge')
@@ -196,8 +179,8 @@ export class AuthController {
   @ApiOperation({ summary: 'Generate a challenge for Stellar wallet signing' })
   @ApiResponse({ status: 200, description: 'Challenge generated successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  generateStellarChallenge(@Body('publicKey') publicKey: string) {
-    return this.authService.generateStellarChallenge(publicKey);
+  generateStellarChallenge(@Body() dto: StellarChallengeDto) {
+    return this.authService.generateStellarChallenge(dto.publicKey);
   }
 
   @Post('stellar-verify')
@@ -207,12 +190,12 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Wallet linked successfully' })
   @ApiResponse({ status: 400, description: 'Invalid signature or challenge' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  verifyStellarSignature(
-    @Req() req: Request,
-    @Body('publicKey') publicKey: string,
-    @Body('signature') signature: string,
-    @Body('challenge') challenge: string
-  ) {
-    return this.authService.verifyStellarSignature(req.user!.id, publicKey, signature, challenge);
+  verifyStellarSignature(@Req() req: Request, @Body() dto: StellarVerifyDto) {
+    return this.authService.verifyStellarSignature(
+      req.user!.id,
+      dto.publicKey,
+      dto.signature,
+      dto.challenge
+    );
   }
 }

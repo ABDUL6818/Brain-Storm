@@ -31,6 +31,7 @@ We use the [MADR (Markdown Any Decision Records)](https://adr.github.io/madr/) t
 | [ADR-008](./ADR-008-registry-integration-separation.md)        | `registry` and `integration` Are Different Kinds of Crates             | Accepted |
 | [ADR-009](./ADR-009-credential-nft-decomposition.md)           | Separate `certificate`, `credential_metadata`, and `nft` Contracts     | Accepted |
 | [ADR-0001](./0001-contract-module-boundaries.md)               | Soroban Contract Module Boundaries and Cross-Contract Call Conventions | Accepted |
+| [ADR-0003](./0003-frontend.md)                                 | Frontend State Management and Data Fetching                            | Accepted |
 | [ADR-010](./ADR-010-backend-module-boundaries.md)              | Backend Module Boundaries for `apps/backend`                           | Proposed |
 | [ADR-011](./ADR-011-contract-shared-conventions.md)            | Shared Contract Error, Storage, and Constant Conventions               | Proposed |
 | [ADR-012](./ADR-012-monorepo-package-boundaries.md)            | Monorepo Package Boundaries and Import Rules (`packages/`)             | Accepted |

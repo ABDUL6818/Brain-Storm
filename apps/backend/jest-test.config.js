@@ -12,17 +12,14 @@ module.exports = {
   },
   collectCoverageFrom: [
     '**/*.(t|j)s',
-    // Explicitly target the refactored modules so the coverage gate reflects
-    // the modularized service/repository code (Issues #37, #38, #39, #40).
-    'users/**/*.ts',
-    'courses/**/*.ts',
-    'credentials/**/*.ts',
-    'payments/**/*.ts',
-    '!**/*.module.ts',
     '!**/*.dto.ts',
-    '!**/index.ts',
-    '!**/*.test.ts',
+    '!**/*.entity.ts',
+    '!**/*.module.ts',
+    '!**/*.interface.ts',
     '!**/*.spec.ts',
+    '!**/*.test.ts',
+    '!**/index.ts',
+    '!main.ts',
   ],
   coverageDirectory: '../coverage',
   coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
@@ -34,26 +31,15 @@ module.exports = {
       branches: 80,
       statements: 85,
     },
-    // Enforce the 85% coverage gate for the refactored modules.
-    './users/': {
+    // Issue #1462: enforce 85% coverage on the modularized auth module
+    // (service + repository). DTOs are excluded via collectCoverageFrom.
+    './auth/auth.service.ts': {
       lines: 85,
       functions: 85,
       branches: 80,
       statements: 85,
     },
-    './courses/': {
-      lines: 85,
-      functions: 85,
-      branches: 80,
-      statements: 85,
-    },
-    './credentials/': {
-      lines: 85,
-      functions: 85,
-      branches: 80,
-      statements: 85,
-    },
-    './payments/': {
+    './auth/auth.repository.ts': {
       lines: 85,
       functions: 85,
       branches: 80,

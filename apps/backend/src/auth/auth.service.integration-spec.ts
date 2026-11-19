@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { AuthService } from './auth.service';
+import { AuthRepository } from './auth.repository';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
 import { User } from '../users/user.entity';
@@ -26,6 +27,7 @@ describe('AuthService (Integration)', () => {
       ],
       providers: [
         AuthService,
+        AuthRepository,
         UsersService,
         {
           provide: MailService,

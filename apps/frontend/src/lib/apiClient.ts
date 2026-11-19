@@ -13,7 +13,19 @@
 
 import type { AxiosRequestConfig } from 'axios';
 
+import type {
+  ApiResponse,
+  ErrorResponse,
+  PaginatedResponse,
+  PaginationQuery,
+  QueryOptions,
+} from '@brain-storm/types';
+
 import api from './api';
+
+// Re-export the shared contract types so components can import everything
+// API-related from this single module.
+export type { ApiResponse, ErrorResponse, PaginatedResponse, PaginationQuery, QueryOptions };
 
 // ── Result type ───────────────────────────────────────────────────────────────
 
@@ -85,6 +97,26 @@ function extractMessage(err: unknown): string {
   return 'An unexpected error occurred.';
 }
 
+/** Maps a backend {@link ErrorResponse} `code` onto an {@link ApiErrorKind}. */
+export function classifyErrorCode(code: string | undefined): ApiErrorKind | undefined {
+  if (!code) return undefined;
+  const normalized = code.toUpperCase();
+  if (normalized.includes('UNAUTHORIZED') || normalized.includes('UNAUTHENTICATED')) {
+    return 'unauthorized';
+  }
+  if (normalized.includes('FORBIDDEN')) return 'forbidden';
+  if (normalized.includes('NOT_FOUND')) return 'not_found';
+  if (normalized.includes('CONFLICT') || normalized.includes('ALREADY_EXISTS')) return 'conflict';
+  if (normalized.includes('VALIDATION') || normalized.includes('INVALID')) return 'validation';
+  if (normalized.includes('INTERNAL') || normalized.includes('SERVER')) return 'server';
+  return undefined;
+}
+
+function extractErrorCode(err: unknown): string | undefined {
+  const data = toAxiosLike(err)?.response?.data as ErrorResponse | undefined;
+  return typeof data?.code === 'string' ? data.code : undefined;
+}
+
 function extractStatus(err: unknown): number | undefined {
   return toAxiosLike(err)?.response?.status;
 }
@@ -110,12 +142,14 @@ async function wrap<T>(promise: Promise<{ data: T }>): Promise<ApiResult<T>> {
     const response = await promise;
     return { ok: true, data: response.data };
   } catch (err) {
+    const status = extractStatus(err);
+    const kind = classifyErrorCode(extractErrorCode(err)) ?? classifyStatus(status);
     return {
       ok: false,
       error: {
         message: extractMessage(err),
-        kind: classifyStatus(extractStatus(err)),
-        status: extractStatus(err),
+        kind,
+        status,
         raw: extractRaw(err),
       },
     };
@@ -151,5 +185,81 @@ export const apiClient = {
     return wrap<T>(api.delete<T>(url, config));
   },
 };
+
+// ── Typed endpoint map ────────────────────────────────────────────────────────
+
+/** Query params accepted by list endpoints. */
+export type ListQuery = QueryOptions & PaginationQuery;
+
+/** Credentials submitted to the login endpoint. */
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+/** Payload returned by the login endpoint. */
+export interface LoginResponse {
+  accessToken: string;
+  refreshToken?: string;
+  user?: UserProfile;
+}
+
+/** Minimal authenticated-user profile. */
+export interface UserProfile {
+  id: string;
+  email: string;
+  name?: string;
+  roles?: string[];
+}
+
+/** A course as returned by the courses endpoints. */
+export interface Course {
+  id: string;
+  title: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Typed endpoint map — the single service layer for the frontend.
+ *
+ * Each method delegates to the generic {@link apiClient} methods above, so
+ * callers get the same `ApiResult<T>` shape while request/response types are
+ * declared in one place.
+ */
+export const ApiRoutes = {
+  auth: {
+    login(credentials: LoginRequest): Promise<ApiResult<LoginResponse>> {
+      return apiClient.post<LoginResponse>('/auth/login', credentials);
+    },
+    logout(): Promise<ApiResult<void>> {
+      return apiClient.post<void>('/auth/logout');
+    },
+  },
+
+  users: {
+    me(): Promise<ApiResult<UserProfile>> {
+      return apiClient.get<UserProfile>('/users/me');
+    },
+  },
+
+  courses: {
+    list(query?: ListQuery): Promise<ApiResult<PaginatedResponse<Course>>> {
+      return apiClient.get<PaginatedResponse<Course>>('/courses', { params: query });
+    },
+    get(id: string): Promise<ApiResult<Course>> {
+      return apiClient.get<Course>(`/courses/${encodeURIComponent(id)}`);
+    },
+    create(payload: Partial<Course>): Promise<ApiResult<Course>> {
+      return apiClient.post<Course>('/courses', payload);
+    },
+    update(id: string, payload: Partial<Course>): Promise<ApiResult<Course>> {
+      return apiClient.patch<Course>(`/courses/${encodeURIComponent(id)}`, payload);
+    },
+    remove(id: string): Promise<ApiResult<void>> {
+      return apiClient.delete<void>(`/courses/${encodeURIComponent(id)}`);
+    },
+  },
+} as const;
 
 export default apiClient;

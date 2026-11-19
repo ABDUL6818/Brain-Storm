@@ -8,7 +8,11 @@
 
 export type WalletType = 'freighter' | 'albedo' | 'xbull' | 'walletconnect';
 
+/** Result of a successful `sign()` on an adapter. */
+export type SignedXdr = string;
+
 /** Result of a successful `connect()` on an adapter. */
+
 export interface WalletConnection {
   publicKey: string;
   /** Network name or passphrase as reported by the wallet. */
@@ -61,6 +65,11 @@ export function toWalletErrorState(error: unknown, walletId?: WalletType): Walle
   return { code: 'UNKNOWN', message, walletId };
 }
 
+/** Narrowing guard so callers can branch on `WalletError` without casts. */
+export function isWalletError(error: unknown): error is WalletError {
+  return error instanceof WalletError;
+}
+
 /**
  * Normalized interface every supported wallet implements. Adding a wallet means
  * adding one file under `adapters/` and registering it — no `if/else` chains in
@@ -76,5 +85,10 @@ export interface WalletAdapter {
   enabled: boolean;
   isInstalled: () => boolean;
   connect: () => Promise<WalletConnection>;
-  sign: (xdr: string) => Promise<string>;
+  sign: (xdr: string) => Promise<SignedXdr>;
+}
+
+/** Props shared by wallet-aware components that only need the adapter id. */
+export interface WalletAdapterProps {
+  walletId: WalletType;
 }

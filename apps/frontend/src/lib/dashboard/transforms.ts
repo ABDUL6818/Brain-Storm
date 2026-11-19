@@ -5,8 +5,20 @@ import type {
   CredentialRecord,
   DashboardStats,
   EnrolledCourse,
+  LeaderboardEntry,
+  LeaderboardSortKey,
   ProgressRecord,
 } from './types';
+import type {
+  CredentialDisplay,
+  CredentialVerificationStatus,
+  LessonListItem,
+  LessonProgressStatus,
+  ProfileFieldErrors,
+  ProfileFormValues,
+  ProfilePayload,
+  ProfileResponse,
+} from './viewerTypes';
 
 /**
  * Pure transforms behind the dashboard. Keeping them out of the components makes
@@ -112,6 +124,39 @@ export function isCourseComplete(progressPct: number): boolean {
   return progressPct === COMPLETE_PCT;
 }
 
+/** Human-readable percentage label, clamped to 0-100. */
+export function formatProgressLabel(progressPct: number): string {
+  const clamped = Math.min(COMPLETE_PCT, Math.max(0, progressPct));
+  return `${Math.round(clamped)}%`;
+}
+
+/** Formats an ISO date string for display; falls back to an em dash when invalid. */
+export function formatIssuedDate(issuedAt: string): string {
+  const date = new Date(issuedAt);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+/** Builds the course lookup keyed by id from a raw course list. */
+export function indexCoursesById(courses: CourseData[]): Record<string, CourseData> {
+  return courses.reduce<Record<string, CourseData>>((acc, course) => {
+    acc[course.id] = course;
+    return acc;
+  }, {});
+}
+
+/** Derives the enrolled-course rows shown on the dashboard from raw API data. */
+export function buildEnrolledCourses(
+  progress: ProgressRecord[],
+  courses: Record<string, CourseData>
+): EnrolledCourse[] {
+  return joinCourses(progress, courses);
+}
+
 /** Applies a real-time progress update to the matching course, if any. */
 export function applyProgressUpdate(
   progress: ProgressRecord[],
@@ -120,4 +165,46 @@ export function applyProgressUpdate(
   return progress.map((p) =>
     p.courseId === update.courseId ? { ...p, progressPct: update.progressPct } : p
   );
+}
+
+/** Normalises the loosely-typed leaderboard payload from the API. */
+export function toLeaderboardEntries(raw: unknown): LeaderboardEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((entry, index) => ({
+    id: entry.id ?? `entry-${index}`,
+    rank: entry.rank ?? index + 1,
+    name: entry.name ?? entry.username ?? 'Anonymous',
+    score: entry.score ?? entry.points ?? 0,
+    avatarUrl: entry.avatarUrl ?? entry.avatar ?? undefined,
+    isCurrentUser: Boolean(entry.isCurrentUser),
+  }));
+}
+
+/** Sorts a copy of `entries`; descending score or ascending rank. */
+export function sortLeaderboardEntries(
+  entries: LeaderboardEntry[],
+  sort: LeaderboardSortKey
+): LeaderboardEntry[] {
+  const sorted = [...entries];
+  if (sort === 'rank') return sorted.sort((a, b) => a.rank - b.rank);
+  return sorted.sort((a, b) => b.score - a.score);
+}
+
+/** Re-derives rank positions from the current ordering (1-based). */
+export function assignRanks(entries: LeaderboardEntry[]): LeaderboardEntry[] {
+  return entries.map((entry, index) => ({ ...entry, rank: index + 1 }));
+}
+
+/** Returns the top `limit` entries after sorting by score. */
+export function topLeaderboardEntries(
+  entries: LeaderboardEntry[],
+  limit: number
+): LeaderboardEntry[] {
+  if (limit <= 0) return [];
+  return sortLeaderboardEntries(entries, 'score').slice(0, limit);
+}
+
+/** Formats a leaderboard score for display (e.g. 1200 -> "1,200"). */
+export function formatLeaderboardScore(score: number): string {
+  return new Intl.NumberFormat('en-US').format(score);
 }
