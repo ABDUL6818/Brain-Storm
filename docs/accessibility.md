@@ -14,22 +14,20 @@ Brain-Storm targets **WCAG 2.1 Level AA** compliance. This document covers testi
 
 ---
 
-## Accessibility Testing with @axe-core/react
+## Accessibility Testing with axe-core
 
-`@axe-core/react` is already installed as a dev dependency. It runs the axe accessibility engine against rendered React components and reports violations.
+Brain-Storm runs axe-core at three layers: unit tests (`vitest-axe`), end-to-end tests (`@axe-core/playwright`), and a Lighthouse CI accessibility gate. `@axe-core/react` is also installed as a dev dependency for the in-browser overlay.
 
 ### Unit Tests (vitest + @testing-library/react)
 
-Integrate axe into component tests using `vitest-axe` or the `axe-core` API directly. Add it alongside existing `@testing-library/react` tests:
+Integrate axe into component tests using `vitest-axe` (already installed). Add it alongside existing `@testing-library/react` tests:
 
 ```typescript
 // apps/frontend/src/__tests__/components/Button.test.tsx
 import { render } from '@testing-library/react';
-import { axe, toHaveNoViolations } from 'jest-axe';
-import { expect } from 'vitest';
+import { axe } from 'vitest-axe';
+import { expect, it } from 'vitest';
 import { Button } from '@/components/ui/Button';
-
-expect.extend(toHaveNoViolations);
 
 it('has no axe violations', async () => {
   const { container } = render(<Button>Submit</Button>);
@@ -37,7 +35,7 @@ it('has no axe violations', async () => {
 });
 ```
 
-Install the required helper:
+`vitest-axe` registers the `toHaveNoViolations` matcher automatically; no `expect.extend` call is needed. If you prefer the `jest-axe` API, it is also available:
 
 ```bash
 npm install --save-dev jest-axe @types/jest-axe --workspace=apps/frontend
@@ -60,11 +58,7 @@ Violations appear in the browser DevTools console with WCAG rule references.
 
 ### E2E Tests (Playwright)
 
-Use `@axe-core/playwright` to run full-page axe scans in e2e tests:
-
-```bash
-npm install --save-dev @axe-core/playwright --workspace=apps/frontend
-```
+`@axe-core/playwright` is installed and used to run full-page axe scans in e2e tests:
 
 ```typescript
 // apps/frontend/e2e/accessibility.spec.ts
@@ -78,6 +72,16 @@ test('courses page has no critical a11y violations', async ({ page }) => {
 });
 ```
 
+### Lighthouse CI Accessibility Gate
+
+Lighthouse CI runs on every PR and enforces an accessibility score threshold. A PR that drops the accessibility score below the configured minimum fails the check. Run it locally with:
+
+```bash
+npm run lhci --workspace=apps/frontend
+```
+
+Fix any reported a11y regressions before requesting review — the gate is blocking.
+
 ---
 
 ## Keyboard Navigation Requirements
@@ -86,14 +90,27 @@ All interactive elements must be fully operable via keyboard alone (WCAG 2.1 SC 
 
 ### Focus Management
 
-- Every interactive element must receive a visible focus indicator. Brain-Storm uses `focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2` on `Button` and `Input`. Apply the same to any new interactive element:
+- Every interactive element must receive a visible focus indicator. The focus ring is defined once as a token in `apps/frontend/tailwind.config.js` and applied via the `focus-ring` utility class on `Button` and `Input`. Apply the same to any new interactive element:
+
+```javascript
+// apps/frontend/tailwind.config.js
+theme: {
+  extend: {
+    // Shared focus-ring token — do not hard-code ring colours in components
+    boxShadow: {
+      'focus-ring': '0 0 0 2px #fff, 0 0 0 4px #2563eb',
+    },
+  },
+}
+```
 
 ```typescript
 // Tailwind classes required on all focusable elements
-'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2';
+'focus-visible:outline-none focus-visible:shadow-focus-ring';
 ```
 
 - Never use `outline: none` or `outline: 0` without providing an equivalent custom focus style.
+- The focus ring must meet WCAG 2.1 SC 1.4.11 (non-text contrast, 3:1) against the adjacent background. The `#2563eb` ring colour is verified against both light (`#fff`) and dark surfaces — do not substitute arbitrary colours.
 
 ### Tab Order
 
@@ -269,6 +286,36 @@ Dropdown menus (e.g. the Navbar user menu) must use the ARIA menu pattern:
 </div>
 ```
 
+### Colour Contrast Tokens
+
+Text and UI colours are defined as tokens in `apps/frontend/tailwind.config.js` and verified against WCAG 2.1 AA contrast ratios (4.5:1 for normal text, 3:1 for large text and UI components). Use the tokens rather than raw hex values so contrast stays consistent:
+
+```javascript
+// apps/frontend/tailwind.config.js
+theme: {
+  extend: {
+    colors: {
+      // Body text — 12.6:1 on white
+      'text-primary': '#111827',
+      // Secondary text — 7.0:1 on white
+      'text-secondary': '#374151',
+      // Muted text — 4.6:1 on white (minimum for normal text)
+      'text-muted': '#6b7280',
+      // Error text — 4.6:1 on white
+      'text-error': '#b91c1c',
+      // Focus ring / interactive accent — 3:1+ against light and dark surfaces
+      'ring-focus': '#2563eb',
+    },
+  },
+}
+```
+
+Rules:
+
+- Never place `text-muted` on a coloured background without re-checking contrast.
+- Do not use `text-gray-400` or lighter for body copy — it fails 4.5:1 on white.
+- Disabled controls are exempt from contrast requirements (WCAG 1.4.3) but must still be distinguishable by more than colour alone.
+
 ### What to Avoid
 
 | Pattern                                       | Problem                                     | Alternative                                |
@@ -291,12 +338,15 @@ Copy this checklist into your PR description for any change that touches UI comp
 ### Automated
 
 - [ ] `axe` scan passes with no WCAG 2.1 AA violations (unit test or dev overlay)
+- [ ] An axe regression test (`vitest-axe`) was added or updated for every touched component
+- [ ] `@axe-core/playwright` e2e scan passes for every touched page
+- [ ] Lighthouse CI accessibility gate passes
 - [ ] No new `eslint-plugin-jsx-a11y` errors introduced
 
 ### Keyboard
 
 - [ ] All new interactive elements are reachable and operable via keyboard alone
-- [ ] Focus indicator is visible on all focusable elements (`focus-visible:ring-2`)
+- [ ] Focus indicator is visible on all focusable elements (`focus-visible:shadow-focus-ring`)
 - [ ] Tab order follows the visual reading order
 - [ ] Modals/dialogs trap focus and return it to the trigger on close
 - [ ] Escape key closes modals, dropdowns, and overlays
@@ -316,6 +366,7 @@ Copy this checklist into your PR description for any change that touches UI comp
 - [ ] `role="progressbar"` includes `aria-valuenow`, `aria-valuemin`, `aria-valuemax`
 - [ ] No ARIA roles or attributes are used incorrectly (e.g. `aria-label` on a `<div>` without a role)
 - [ ] Landmark regions are labelled where multiple of the same type exist on a page
+- [ ] Colours use the contrast tokens from `tailwind.config.js` (no raw hex or `text-gray-400` body copy)
 
 ### Images & Media
 

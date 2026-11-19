@@ -7,7 +7,14 @@ module.exports = {
       jsx: true,
     },
   },
-  plugins: ['@typescript-eslint/eslint-plugin', 'react', 'react-hooks', 'import', 'filenames'],
+  plugins: [
+    '@typescript-eslint/eslint-plugin',
+    'react',
+    'react-hooks',
+    'import',
+    'filenames',
+    'unused-imports',
+  ],
   extends: [
     'next/core-web-vitals',
     'plugin:@typescript-eslint/recommended',
@@ -69,6 +76,22 @@ module.exports = {
     ],
     'import/no-cycle': ['warn', { maxDepth: 3, ignoreExternal: true }],
     'import/no-duplicates': 'error',
+    // Flag unused imports in-editor; unused exports are reported by `lint:dead-code` (knip).
+    'unused-imports/no-unused-imports': 'error',
+    'import/no-unused-modules': [
+      'warn',
+      {
+        unusedExports: true,
+        ignoreExports: [
+          'src/app/**/{page,layout,loading,error,not-found,route,template}.{ts,tsx}',
+          'src/pages/**/*.{ts,tsx}',
+          'src/middleware.ts',
+          'next.config.js',
+          '.storybook/main.ts',
+          'e2e/**/*.{ts,tsx}',
+        ],
+      },
+    ],
     // File names must be kebab-case; suffixes like .d.ts, .spec.ts and .test.ts are allowed.
     'filenames/match-regex': [
       'error',
@@ -94,6 +117,18 @@ module.exports = {
         'no-console': 'off',
         '@typescript-eslint/explicit-module-boundary-types': 'off',
       },
+    },
+    {
+      // Entry points are consumed by the framework, not by other modules.
+      files: [
+        'src/app/**/*.{ts,tsx}',
+        'src/pages/**/*.{ts,tsx}',
+        'src/middleware.ts',
+        'next.config.js',
+        '.storybook/main.ts',
+        'e2e/**/*.{ts,tsx}',
+      ],
+      rules: { 'import/no-unused-modules': 'off' },
     },
     {
       // Next.js special files and config files keep their framework-mandated names.
