@@ -10,9 +10,22 @@ All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md
 
 1. **Fork the repository** on GitHub.
 2. **Clone your fork** locally: `git clone https://github.com/<your-username>/Brain-Storm.git`
-3. **Follow the [Developer Setup Guide](docs/contributing/setup.md)** to set up your environment.
+3. **Follow the [Developer Setup Guide](docs/SETUP.md)** to set up your environment (see also the [setup notes](docs/contributing/setup.md)).
 4. **Create a new branch** from `main` for your change (see naming conventions below).
 5. Make your changes, add tests, and open a pull request.
+
+## Documentation
+
+Key reference documents for contributors and API consumers:
+
+| Document | What it covers |
+| -------- | -------------- |
+| [docs/SETUP.md](docs/SETUP.md) | Developer setup and local deployment (Docker Compose, env vars, running services) |
+| [docs/API.md](docs/API.md) | OpenAPI reference for external API consumers |
+| [docs/adr/0001-contracts.md](docs/adr/0001-contracts.md) | ADR: contract architecture and the `contracts/shared` crate |
+| [docs/adr/0002-backend.md](docs/adr/0002-backend.md) | ADR: backend module boundaries and error strategy |
+
+Architecture decisions are recorded as ADRs under [`docs/adr/`](docs/adr/). If your change alters a documented decision, update the relevant ADR (or add a new one) in the same PR.
 
 ## Task Tracking & TODOs
 
@@ -208,7 +221,7 @@ cd apps/backend && npm test
 npm run lint
 ```
 
-See [docs/contributing/setup.md](docs/contributing/setup.md) for the full setup guide.
+See [docs/SETUP.md](docs/SETUP.md) for the full setup and local deployment guide, and [docs/API.md](docs/API.md) for the API reference.
 
 ## Architecture Decisions
 

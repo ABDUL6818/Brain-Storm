@@ -315,6 +315,8 @@ GitHub Actions workflows in `.github/workflows/` run on every push and PR:
 4. Ensure all CI checks pass
 5. Open a pull request with a detailed description
 
+New to the codebase? Start with the [developer setup guide](./docs/SETUP.md), then read the architecture decisions in [docs/adr/0001-contracts.md](./docs/adr/0001-contracts.md) and [docs/adr/0002-backend.md](./docs/adr/0002-backend.md). API consumers should begin with the [OpenAPI reference](./docs/API.md).
+
 ---
 
 ## Stellar & Soroban Resources
