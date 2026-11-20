@@ -142,4 +142,9 @@ export const validationSchema = Joi.object({
 
   // ── Export OpenAPI ────────────────────────────────────────────────────────
   EXPORT_OPENAPI: Joi.boolean().default(false),
+
+  // ── Build metadata and indexer (#1477) ────────────────────────────────────
+  APP_VERSION: Joi.string().optional(),
+  GITHUB_REF: Joi.string().allow('').optional(),
+  INDEXER_CATCHUP: Joi.boolean().default(false),
 });
