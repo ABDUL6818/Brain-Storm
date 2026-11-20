@@ -7,6 +7,7 @@ import { rpc } from '@stellar/stellar-sdk';
 import { CredentialsService } from '../credentials/credentials.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UsersService } from '../users/users.service';
+import { StellarSdkService } from './stellar-sdk.service';
 
 const LAST_LEDGER_KEY = 'indexer:last_ledger';
 
@@ -48,9 +49,11 @@ export class StellarIndexerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private configService: ConfigService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
-    private eventDispatcher: ContractEventDispatcher
+    private eventDispatcher: ContractEventDispatcher,
+    // Builds the Soroban client through the shared SDK entry point (#1479).
+    private sdk: StellarSdkService = new StellarSdkService()
   ) {
-    this.sorobanServer = new rpc.Server(
+    this.sorobanServer = this.sdk.createSorobanServer(
       this.configService.get<string>('stellar.sorobanRpcUrl') ?? '',
     );
     this.analyticsContractId = this.configService.get<string>('stellar.analyticsContractId') ?? '';

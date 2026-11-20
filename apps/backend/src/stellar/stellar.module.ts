@@ -42,13 +42,14 @@ import { LoggerModule } from '../common/logger/logger.module';
         cacheManager: any,
         dispatcher: ContractEventDispatcher,
         analyticsHandler: AnalyticsEventHandler,
-        tokenHandler: TokenEventHandler
+        tokenHandler: TokenEventHandler,
+        sdk: StellarSdkService
       ) => {
         dispatcher.register(analyticsHandler);
         dispatcher.register(tokenHandler);
-        return new StellarIndexerService(configService, cacheManager, dispatcher);
+        return new StellarIndexerService(configService, cacheManager, dispatcher, sdk);
       },
-      inject: ['ConfigService', 'CACHE_MANAGER', ContractEventDispatcher, AnalyticsEventHandler, TokenEventHandler],
+      inject: ['ConfigService', 'CACHE_MANAGER', ContractEventDispatcher, AnalyticsEventHandler, TokenEventHandler, StellarSdkService],
     },
   ],
   controllers: [StellarController, CredentialsController],
