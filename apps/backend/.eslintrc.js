@@ -57,6 +57,7 @@ module.exports = {
       true,
     ],
     complexity: ['error', { max: 15 }],
+    'no-console': 'error',
     'max-lines-per-function': [
       'error',
       {
@@ -87,6 +88,13 @@ module.exports = {
       files: ['**/index.ts'],
       rules: {
         'filenames/match-regex': 'off',
+      },
+    },
+    {
+      // Soroban sandbox specs log skip reasons to the console on purpose (#1473).
+      files: ['src/stellar/stellar.service.soroban-spec.ts'],
+      rules: {
+        'no-console': 'off',
       },
     },
   ],
