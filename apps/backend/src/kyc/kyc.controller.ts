@@ -6,14 +6,18 @@ import {
   Post,
   Put,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiConsumes } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { KycService } from './kyc.service';
 
 @ApiTags('kyc')
 @Controller('kyc')
+// Every KYC route needs an authenticated caller (#1480).
+@UseGuards(JwtAuthGuard)
 export class KycController {
   constructor(private kycService: KycService) {}
 
