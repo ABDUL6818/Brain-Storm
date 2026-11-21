@@ -5,10 +5,13 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { User } from '../users/user.entity';
 
 @Entity('refresh_tokens')
+// Token checks look up a user's live (not revoked) tokens (#1475).
+@Index(['userId', 'revoked'])
 export class RefreshToken {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
