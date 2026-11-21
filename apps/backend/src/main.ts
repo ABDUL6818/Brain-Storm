@@ -31,18 +31,6 @@ async function bootstrap() {
   // This alone cuts JSON list-endpoint payloads by ~65–75 %.
   app.use(compression({ threshold: 1024 }));
 
-  import { Request, Response } from 'express';
-
-  // ... (later in the file)
-
-  app.use('/v0', (req: Request, res: Response) => {
-    res.status(410).json({
-      message: 'The /v0 API is deprecated. Please migrate to /v1.',
-      migrationGuide: '/api/docs#versioning',
-      deprecated: true,
-    });
-  });
-
   app.setGlobalPrefix('v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }), new SanitizationPipe());
   // #799: Single unified exception filter — replaces HttpExceptionFilter +
